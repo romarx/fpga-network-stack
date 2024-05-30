@@ -27,7 +27,7 @@ set(DATA_WIDTH 64 CACHE STRING "Width of data path in bytes")
 set(PMTU_BYTES 4096 CACHE STRING "PMTU size.")
 set(CLOCK_PERIOD 6.4 CACHE STRING "Target clock period in nanoseconds")
 # RoCE parameters
-set(ROCE_STACK_MAX_QPS 500 CACHE STRING "Maximum number of queue pairs the RoCE stack can support")
+set(ROCE_STACK_MAX_QPS 256 CACHE STRING "Maximum number of queue pairs the RoCE stack can support")
 
 # Find Xilinx HLS
 find_package(VivadoHLS REQUIRED)
@@ -45,10 +45,10 @@ endif()
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv4/ipv4_config.hpp.in ipv4_config.hpp)
-#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv6/ipv6_config.hpp.in ipv6_config.hpp)
-#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../udp/udp_config.hpp.in udp_config.hpp)
-#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rocev2_config.hpp.in rocev2_config.hpp)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv4/ipv4_config.hpp.in ipv4_config.hpp)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv6/ipv6_config.hpp.in ipv6_config.hpp)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../udp/udp_config.hpp.in udp_config.hpp)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rocev2_config.hpp.in rocev2_config.hpp)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/make.tcl.in make.tcl)
 
 

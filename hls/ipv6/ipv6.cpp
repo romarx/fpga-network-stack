@@ -25,6 +25,7 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "ipv6.hpp"
+#include "ipv6_config.hpp"
 
 template <int WIDTH>
 void process_ipv6(	stream<net_axis<WIDTH> >&	input,

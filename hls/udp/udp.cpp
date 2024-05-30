@@ -25,6 +25,7 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "udp.hpp"
+#include "udp_config.hpp"
 
 template <int WIDTH>
 void process_udp(	stream<net_axis<WIDTH> >& input,

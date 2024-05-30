@@ -485,7 +485,7 @@ template <>
 void assignDest<routed_net_axis<512> >(routed_net_axis<512>& d, routed_net_axis<512>& s);
 
 // The 2nd template parameter is a hack to use this function multiple times
-template <typename T, int W, int whatever>
+template <typename T, int W, int whatever, int INSTID = 0>
 void rshiftWordByOctet(	uint16_t offset,
 						hls::stream<T>& input,
 						hls::stream<T>& output)
@@ -560,7 +560,7 @@ void rshiftWordByOctet(	uint16_t offset,
 }
 
 // The 2nd template parameter is a hack to use this function multiple times
-template <int W, int whatever>
+template <int W, int whatever, int INSTID = 0>
 void lshiftWordByOctet(	uint16_t offset,
 						hls::stream<net_axis<W> >& input,
 						hls::stream<net_axis<W> >& output)

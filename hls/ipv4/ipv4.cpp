@@ -25,6 +25,7 @@
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "ipv4.hpp"
+#include "ipv4_config.hpp"
 
 template <int WIDTH>
 void process_ipv4(	stream<net_axis<WIDTH> >&		dataIn,
