@@ -6,7 +6,7 @@ project(hash_table
         VERSION 1.0)
 
 # Target options
-set(FNS_PLATFORM_PART "xcu55c-fsvh2892-2L-e" CACHE STRING "FPGA platform part")
+set(FNS_PLATFORM_PART "xcu250-figd2104-2L-e" CACHE STRING "FPGA platform part")
 set(FNS_TCP_STACK_MAX_SESSIONS 1000 CACHE STRING "Max number of entries")
 
 # Find Vitis

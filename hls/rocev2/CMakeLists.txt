@@ -21,7 +21,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../../cma
 #endif()
 
 
-set(FPGA_PART xcvu9p-flgb2104-3-e CACHE STRING "FPGA part")
+set(FPGA_PART xcu250-figd2104-2L-e CACHE STRING "FPGA part")
 set(RETRANS_EN 1 CACHE STRING "Re-transmission logic enable")
 set(DATA_WIDTH 64 CACHE STRING "Width of data path in bytes")
 set(PMTU_BYTES 4096 CACHE STRING "PMTU size.")
@@ -45,10 +45,10 @@ endif()
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv4/ipv4_config.hpp.in ipv4_config.hpp)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv6/ipv6_config.hpp.in ipv6_config.hpp)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../udp/udp_config.hpp.in udp_config.hpp)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rocev2_config.hpp.in rocev2_config.hpp)
+#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv4/ipv4_config.hpp.in ipv4_config.hpp)
+#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../ipv6/ipv6_config.hpp.in ipv6_config.hpp)
+#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../udp/udp_config.hpp.in udp_config.hpp)
+#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rocev2_config.hpp.in rocev2_config.hpp)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/make.tcl.in make.tcl)
 
 
@@ -57,7 +57,7 @@ set(EXAMPLE_HLS_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/rocev2.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rocev2_config.hpp.in
     # ${CMAKE_CURRENT_SOURCE_DIR}/test_rocev2.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_ib_transport.cpp
+    # ${CMAKE_CURRENT_SOURCE_DIR}/test_ib_transport.cpp
     )
 
 

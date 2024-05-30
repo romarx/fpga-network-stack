@@ -8,7 +8,7 @@ project(fpga-network-stack)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/xilinx-cmake)
 
 # Target options
-set(FNS_PLATFORM "xilinx_u55c_gen3x16_xdma_3_202210_1" CACHE STRING "FPGA platform")
+set(FNS_PLATFORM "xilinx_u250_gen3x16_xdma_4_1_202210_1" CACHE STRING "FPGA platform")
 #set(FNS_CLOCK_PERIOD "3.2" CACHE STRING "Target clock period in nanoseconds")
 
 # Domain options
@@ -36,4 +36,4 @@ add_subdirectory(hls/udp)
 # add_subdirectory(hls/echo_server_application)
 # add_subdirectory(hls/iperf_client)
 # add_subdirectory(hls/iperf_udp)
-# add_subdirectory(hls/rocev2)
+add_subdirectory(hls/rocev2)

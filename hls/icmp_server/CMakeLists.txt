@@ -6,7 +6,7 @@ project(icmp_server
         VERSION 1.67)
 
 # Target options
-set(FNS_PLATFORM_PART "xcu55c-fsvh2892-2L-e" CACHE STRING "FPGA platform part")
+set(FNS_PLATFORM_PART "xcu250-figd2104-2L-e" CACHE STRING "FPGA platform part")
 
 # Find Vitis
 find_package(Vitis REQUIRED)

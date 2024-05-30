@@ -5,7 +5,7 @@ project(ip_handler
         VERSION 2.0)
 
 # Target options
-set(FNS_PLATFORM_PART "xcu55c-fsvh2892-2L-e" CACHE STRING "FPGA platform part")
+set(FNS_PLATFORM_PART "xcu250-figd2104-2L-e" CACHE STRING "FPGA platform part")
 
 # Domain options
 set(FNS_DATA_WIDTH 8 CACHE STRING "Width of data path in bytes")

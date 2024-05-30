@@ -16,7 +16,7 @@ add_vitis_ip(${PROJECT_NAME}
               "test_arp_server_subnet.cpp"
             HLS_FLAGS
               "-DMY_IMPORTANT_DEFINITION -O2"
-            PLATFORM_PART "xcu55c-fsvh2892-2L-e"
+            PLATFORM_PART "xcu250-figd2104-2L-e"
             VENDOR "ethz.systems.fpga"
             DISPLAY_NAME "ARP Subnet Server"
             DESCRIPTION "Replies to ARP queries and resolves IP addresses."
