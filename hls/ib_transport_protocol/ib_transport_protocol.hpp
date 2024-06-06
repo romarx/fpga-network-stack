@@ -126,7 +126,7 @@ struct qpContext
 	ap_uint<24> local_psn;
 	// Needs to be 32 Bit according to specification - changed that 
 	// ap_uint<32> r_key;
-	ap_uint<48> virtual_address;
+	ap_uint<64> virtual_address;
 	ap_uint<32> r_key;
 	qpContext() {}
 	qpContext(qpState newState, ap_uint<24> qp_num, ap_uint<24> remote_psn, ap_uint<24> local_psn, ap_uint<16> r_key, ap_uint<64> virtual_address)
@@ -202,7 +202,7 @@ struct memCmdInternal
 /* Mem command */
 struct memCmd
 {
-	ap_uint<48> addr;
+	ap_uint<64> addr;
 	ap_uint<28> len;
 	ap_uint<1>  ctl;
     ap_uint<1>  strm;
@@ -214,14 +214,14 @@ struct memCmd
 	memCmd() {}
 
 	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(47,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(pid), vfid(vfid) {}
+		:addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(pid), vfid(vfid) {}
 	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<24> qpn)
-        :addr(addr(47,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(qpn(5,0)), vfid(qpn(9,6)) {}
+        :addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(qpn(5,0)), vfid(qpn(9,6)) {}
 
     memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(47,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(pid), vfid(vfid) {}
+		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(pid), vfid(vfid) {}
     memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<24> qpn)
-		:addr(addr(47,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(qpn(5,0)), vfid(qpn(9,6)) {}
+		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(qpn(5,0)), vfid(qpn(9,6)) {}
 };
 
 struct routedMemCmd

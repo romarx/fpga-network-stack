@@ -281,7 +281,7 @@ void rocev2_top(
 	
 #else
 void rocev2_top(
-	stream<net_axis<DATA_WIDTH> >&	s_axis_rx_data,
+	stream<net_axis<DATA_WIDTH> >& s_axis_rx_data,
 	stream<net_axis<DATA_WIDTH> >& m_axis_tx_data,
 				
 	stream<txMeta>&	s_axis_sq_meta,
