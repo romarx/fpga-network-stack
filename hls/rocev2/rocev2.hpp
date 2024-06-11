@@ -27,7 +27,6 @@
 #pragma once
 
 #define IP_VERSION 4
-// #define RETRANS_EN
 
 #include "../axi_utils.hpp"
 #include "../ipv4/ipv4.hpp"
@@ -67,7 +66,9 @@ void rocev2(
 	
 	// Debug
 #ifdef DBG_IBV
-	hls::stream<psnPkg>& m_axis_dbg,
+	hls::stream<psnPkg>& m_axis_dbg_0,
+    hls::stream<psnPkg>& m_axis_dbg_1,
+    hls::stream<psnPkg>& m_axis_dbg_2,
 #endif 
 	ap_uint<32>& regCrcDropPkgCount,
 	ap_uint<32>& regInvalidPsnDropCount,

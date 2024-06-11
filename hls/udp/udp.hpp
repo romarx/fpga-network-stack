@@ -32,7 +32,6 @@
 #include "../ipv4/ipv4.hpp"
 //#include "../ipv6/ipv6.hpp"
 
-
 #define IP_VERSION 4
 
 #if IP_VERSION == 6
@@ -110,8 +109,6 @@ public:
 };
 
 template <int WIDTH>
-
-// Renamed from udp_core to just udp
 void udp(		hls::stream<ipMeta>&		s_axis_rx_meta,
 				hls::stream<net_axis<WIDTH> >&	s_axis_rx_data,
 				hls::stream<ipUdpMeta>&	m_axis_rx_meta,

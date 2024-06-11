@@ -37,12 +37,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace hls;
 
-//#define DBG_IBV_IBH_PROCESS
-#define DBG_IBV_IBH_FSM
-
-#if defined(DBG_IBV_IBH_PROCESS) || defined(DBG_IBV_IBH_FSM)
 #define DBG_IBV
-#endif
 
 const uint32_t BTH_SIZE = 96;
 const uint32_t RETH_SIZE = 128;
@@ -69,6 +64,11 @@ typedef enum {
 } pkgCtlType;
 
 typedef enum {
+	PKG_R = 0,
+    PKG_NR = 1
+} pkgRetransType;
+
+typedef enum {
 	PKG_INT = 0,
 	PKG_HOST = 1
 } pkgHostType;
@@ -82,11 +82,6 @@ typedef enum {
     NO_SYNC = 0,
     SYNC = 1
 } syncType;
-
-typedef enum {
-    NO_STRM = 0,
-    STRM = 1
-} strmType;
 
 //See page 246
 typedef enum {
@@ -116,20 +111,16 @@ bool checkIfAethHeader(ibOpCode code);
 bool checkIfRethHeader(ibOpCode code);
 
 /* QP context */
-// Was 3 + 3*24 + 16 + 64 = 155 Bit, is now 171 bit (with full 32-bit rkey)
 struct qpContext
 {
-	// I'm not sure which role the order of these fields play in here when receiving values from s_axis_qp_interface
 	qpState		newState;
 	ap_uint<24> qp_num;
 	ap_uint<24> remote_psn;
 	ap_uint<24> local_psn;
-	// Needs to be 32 Bit according to specification - changed that 
-	// ap_uint<32> r_key;
-	ap_uint<64> virtual_address;
 	ap_uint<32> r_key;
+	ap_uint<64> virtual_address;
 	qpContext() {}
-	qpContext(qpState newState, ap_uint<24> qp_num, ap_uint<24> remote_psn, ap_uint<24> local_psn, ap_uint<16> r_key, ap_uint<64> virtual_address)
+	qpContext(qpState newState, ap_uint<24> qp_num, ap_uint<24> remote_psn, ap_uint<24> local_psn, ap_uint<32> r_key, ap_uint<64> virtual_address)
 				:newState(newState), qp_num(qp_num), remote_psn(remote_psn), local_psn(local_psn), r_key(r_key), virtual_address(virtual_address) {}
 };
 
@@ -169,7 +160,7 @@ struct fwdPolicy
 		:isDrop(drop), ackOnly(ack) {}
 };
 
-//TODO move to UDP/IP
+// TODO move to UDP/IP
 struct dstTuple
 {
 	ap_uint<128> their_address;
@@ -188,50 +179,35 @@ struct memCmdInternal
 	ap_uint<32> len;
 	ap_uint<1>  host;
     ap_uint<1>  sync;
-    ap_uint<4>  offs;
+    ap_uint<6>  offs;
 	memCmdInternal() {}
 	memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len, ap_uint<1> host)
-		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(0), offs(0) {}
-    memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len, ap_uint<1> host, ap_uint<4> offs)
-		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(1), offs(offs) {}
+		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(1), offs(0) {}
+    memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len, ap_uint<1> host, ap_uint<1> sync, ap_uint<6> offs)
+		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(sync), offs(offs) {}
     // TODO: need to set some default value?
     memCmdInternal(ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len)
-        : qpn(qpn), addr(addr), len(len), host(1), sync(0) {}
+        : qpn(qpn), addr(addr), len(len), host(1), sync(1) {}
 };
 
 /* Mem command */
 struct memCmd
 {
+	ibOpCode	op_code;
+	ap_uint<16> qpn;
+	ap_uint<1>  lst;
 	ap_uint<64> addr;
+	ap_uint<4>  dst;
+	ap_uint<2>  strm;
 	ap_uint<28> len;
-	ap_uint<1>  ctl;
-    ap_uint<1>  strm;
-    ap_uint<1>  sync;
+	ap_uint<1>  actv;
 	ap_uint<1>  host;
-    ap_uint<4>  tdst;
-	ap_uint<6>  pid;
-	ap_uint<4>  vfid; 
+	ap_uint<6>  offs;
+
 	memCmd() {}
-
-	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(pid), vfid(vfid) {}
-	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<24> qpn)
-        :addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(qpn(5,0)), vfid(qpn(9,6)) {}
-
-    memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(pid), vfid(vfid) {}
-    memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<24> qpn)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(qpn(5,0)), vfid(qpn(9,6)) {}
+	memCmd(ibOpCode op_code, ap_uint<16> qpn, ap_uint<1> lst, ap_uint<64> addr, ap_uint<28> len, ap_uint<1> actv, ap_uint<1> host, ap_uint<6> offs)
+		:op_code(op_code), qpn(qpn), lst(lst), addr(addr), dst(addr(51,48)), strm(addr(53,52)), len(len), actv(actv), host(host), offs(offs) {}
 };
-
-struct routedMemCmd
-{
-	memCmd      data;
-	routedMemCmd() {}
-	routedMemCmd(ap_uint<64> addr, ap_uint<32> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<24> qpn)
-		:data(addr, len(27,0), ctl, host, qpn(5,0), qpn(9,6)) {}
-};
-
 
 /* TX */
 struct txPacketInfo
@@ -241,30 +217,37 @@ struct txPacketInfo
 	bool hasPayload;
 };
 
-// Probably rkey should be installed as part of the params in this structure - this comes from externally and carries all other relevant information 
 struct txMeta
 {
 	ibOpCode 	 op_code; // 32
-	ap_uint<10>  qpn; // vfid, pid
+	ap_uint<16>  qpn; // vfid, pid
 	ap_uint<1>   host;
 	ap_uint<1>   lst;
-	ap_uint<4>   offs;
-	ap_uint<192> params;
+	ap_uint<6>   offs;
+    ap_uint<64>  raddr;
+    ap_uint<64>  laddr;
+    ap_uint<32>  len;
+    ap_uint<32>  imm;
 	txMeta()
 		:op_code(RC_RDMA_WRITE_ONLY) {}
-	txMeta(ibOpCode op, ap_uint<10> qp, ap_uint<1> host, ap_uint<1> lst, ap_uint<4> offs, ap_uint<192> params)
-				:op_code(op), qpn(qp), host(host), lst(lst), offs(offs), params(params) {}
+	txMeta(ibOpCode op, ap_uint<16> qp, ap_uint<1> host, ap_uint<1> lst, ap_uint<6> offs, 
+        ap_uint<64> laddr, ap_uint<64> raddr, ap_uint<32> len, ap_uint<32> imm)
+				:op_code(op), qpn(qp), host(host), lst(lst), offs(offs), raddr(raddr), laddr(laddr), len(len), imm(imm) {}
 };
 
 /* ACK meta */
 struct ackMeta 
 {
-	ap_uint<1> rd;
-	ap_uint<10> qpn;
-	ap_uint<24> psn;
+    ibOpCode   op_code; // 32
+	ap_uint<16> qpn;
+    ap_uint<1> host;
+    ap_uint<4> dst;
+    ap_uint<2> strm;
+    ap_uint<1> lst;
+
 	ackMeta() {}
-	ackMeta(bool rd, ap_uint<10> qpn, ap_uint<24> psn)
-		: rd(rd), qpn(qpn), psn(psn) {}
+	ackMeta(ibOpCode op_code, ap_uint<16> qpn, ap_uint<1> host, ap_uint<4> dst, ap_uint<2> strm, ap_uint<1> lst)
+		: op_code(op_code), qpn(qpn), host(host), dst(dst), strm(strm),  lst(lst) {}
 };
 
 /* Event */
@@ -400,25 +383,6 @@ public:
 	{
 		return ibOpCode((uint16_t) header(7, 0));
 	}
-	
-	// New setter-methods for the Opcode-Bits - order is somehow reversed compared to the comments given above this function 
-	void setSolicitedEvent(bool bit)
-	{
-		header[15] = bit;
-	}
-	void setMigReq(bool bit)
-	{
-		header[14] = bit;
-	}
-	void setPadCount(ap_uint<2> pad_count)
-	{
-		header(13, 12) = pad_count;
-	}
-	void setHeaderVersion(ap_uint<4> header_version)
-	{
-		header(11, 8) = header_version;
-	}
-
 	void setPartitionKey(ap_uint<16> key)
 	{
 		header(31, 16) = key;
@@ -596,14 +560,13 @@ struct InvalidateExHeader //IETH
 
 struct psnPkg
 {
-	ap_uint<4> ctl;
-	ap_uint<24> psn;
-	ap_uint<24> epsn;
-	ibOpCode 	op_code;
+    ibOpCode opcode;
+	ap_uint<32> val1;
+    ap_uint<32> val2;
+	ap_uint<8> ctl;
 
-
-	psnPkg(ap_uint<4> ctl, ap_uint<24> psn, ap_uint<24> epsn, ibOpCode op_code) 
-		: ctl(ctl), psn(psn), epsn(epsn), op_code(op_code)  {}
+	psnPkg(ibOpCode opcode, ap_uint<32> val1, ap_uint<32> val2, ap_uint<8> ctl) 
+		: opcode(opcode), val1(val1), val2(val2), ctl(ctl) {}
 };
 
 struct rtrPkg
@@ -614,15 +577,6 @@ struct rtrPkg
 
 	rtrPkg(ap_uint<24> r1, ap_uint<24> r2, ap_uint<4> ctl) 
 		: r1(r1), r2(r2), ctl(ctl) {}
-};
-
-struct tmrPkg
-{
-	ap_uint<16> qpn;
-	ap_uint<4> retries;
-
-	tmrPkg(ap_uint<16> qpn, ap_uint<4> retries) 
-		: qpn(qpn), retries(retries) {}
 };
 
 template <int WIDTH, int INSTID>
@@ -654,6 +608,8 @@ void ib_transport_protocol(
 	// Debug
 #ifdef DBG_IBV
 	hls::stream<psnPkg>& m_axis_dbg_0, 
+    hls::stream<psnPkg>& m_axis_dbg_1, 
+    hls::stream<psnPkg>& m_axis_dbg_2, 
 #endif
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,
