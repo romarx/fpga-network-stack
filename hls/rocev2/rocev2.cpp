@@ -21,7 +21,7 @@
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THmE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "rocev2_config.hpp"
@@ -48,6 +48,40 @@ void rocev2(
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+
+	hls::stream<ackEvent>& tx_ackEvent_debug, 
+
+	hls::stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debugging outputs from generate_ibh in ib_transport_protocol.cpp
+	hls::stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	hls::stream<gibhPsnDebug>& tx_gibh_psn_debug,  
+
+	// Debugging output from prepend_ibh in ib_transport_protocol.cpp 
+	hls::stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+
+	// Debugging output from generate_exh in ib_transport_protocol.cpp
+	hls::stream<event>& tx_gexh_meta_debug,
+
+	// Debugging output from tx_ipUdpMetaMerger in ib_transport_protocol.cpp
+	hls::stream<ap_uint<4> >& tx_iumm_fire_debug,
+
+	// Debugging output from prepend_ibh in ib_transport_protocol.cpp 
+	hls::stream<pibhDebug>& tx_pibh_fire_debug,
+
+	// Debugging output from local_req_handler in transport_protocol.cpp
+	hls::stream<pibhDebug>& tx_lrh_fire_debug,
+
+	// Debug Output from rx_ibh_fsm
+	hls::stream<ibhFsmMeta>& tx_ibhfsm_metain_debug,
+
+	// Debug Output from generate_exh 
+	hls::stream<ap_uint<4> >& tx_gexh_state_debug, 
+
+	// Debug Output from generate_ibh
+	hls::stream<ap_uint<4> >& tx_gibh_state_debug, 
+
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,
 
 	//Debug output
 #ifdef DBG_IBV
@@ -157,6 +191,20 @@ void rocev2(
 		s_axis_mem_read_data,
 		s_axis_qp_interface,
 		s_axis_qp_conn_interface,
+		tx_ackEvent_debug, 
+		tx_ibhHeaderFifo_debug, 
+		tx_gibh_opcode_debug, 
+		tx_gibh_psn_debug, 
+		tx_pibh_opcode_debug, 
+		tx_gexh_meta_debug,
+		tx_iumm_fire_debug,
+		tx_pibh_fire_debug,
+		tx_lrh_fire_debug,
+		tx_ibhfsm_metain_debug,
+		tx_gexh_state_debug,
+		tx_gibh_state_debug,
+		tx_iumm_dstQpFifo_debug,
+
 #ifdef DBG_IBV
 		m_axis_dbg,
 #endif
@@ -187,6 +235,25 @@ void rocev2_top(
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	stream<ackEvent>& tx_ackEvent_debug, 
+
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debugging outputs from generate_ibh in ib_transport_protocol.cpp
+	stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	stream<gibhPsnDebug>& tx_gibh_psn_debug,  
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+	stream<event>& tx_gexh_meta_debug,
+	stream<ap_uint<4> >& tx_iumm_fire_debug,
+	stream<pibhDebug>& tx_pibh_fire_debug, 
+	stream<pibhDebug>& tx_lrh_fire_debug,	
+
+	// Debugging outputs from rx_ibh_fsm in ib_transport_protocol.cpp
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug,
+	stream<ap_uint<4> >& tx_gexh_state_debug,
+	stream<ap_uint<4> >& tx_gibh_state_debug, 
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,
+
 
 	//Debug output
 #ifdef DBG_IBV
@@ -229,6 +296,20 @@ void rocev2_top(
 
 	#pragma HLS INTERFACE ap_none register port=local_ip_address
 
+	#pragma HLS INTERFACE axis register port=tx_ackEvent_debug
+	#pragma HLS INTERFACE axis register port=tx_ibhHeaderFifo_debug
+	#pragma HLS INTERFACE axis register port=tx_gibh_opcode_debug
+	#pragma HLS INTERFACE axis register port=tx_gibh_psn_debug
+	#pragma HLS INTERFACE axis register port=tx_pibh_opcode_debug
+	#pragma HLS INTERFACE axis register port=tx_gexh_meta_debug
+	#pragma HLS INTERFACE axis register port=tx_iumm_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_pibh_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_lrh_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_ibhfsm_metain_debug
+	#pragma HLS INTERFACE axis register port=tx_gexh_state_debug
+	#pragma HLS INTERFACE axis register port=tx_gibh_state_debug
+	#pragma HLS INTERFACE axis register port=tx_iumm_dstQpFifo_debug
+
 	//DEBUG
 #ifdef DBG_IBV
 	#pragma HLS INTERFACE axis register port=m_axis_dbg
@@ -269,6 +350,21 @@ void rocev2_top(
 		s_axis_qp_conn_interface,
 		local_ip_address,
 
+		tx_ackEvent_debug, 
+
+		tx_ibhHeaderFifo_debug, 
+		tx_gibh_opcode_debug, 
+		tx_gibh_psn_debug, 
+		tx_pibh_opcode_debug, 
+		tx_gexh_meta_debug,
+		tx_iumm_fire_debug,
+		tx_pibh_fire_debug,
+		tx_lrh_fire_debug,
+		tx_ibhfsm_metain_debug,
+		tx_gexh_state_debug,
+		tx_gibh_state_debug,
+		tx_iumm_dstQpFifo_debug, 
+
 #ifdef DBG_IBV
 		m_axis_dbg,
 #endif 
@@ -281,7 +377,7 @@ void rocev2_top(
 	
 #else
 void rocev2_top(
-	stream<net_axis<DATA_WIDTH> >& s_axis_rx_data,
+	stream<net_axis<DATA_WIDTH> >&	s_axis_rx_data,
 	stream<net_axis<DATA_WIDTH> >& m_axis_tx_data,
 				
 	stream<txMeta>&	s_axis_sq_meta,
@@ -298,6 +394,30 @@ void rocev2_top(
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+
+	stream<ackEvent>& tx_ackEvent_debug, 
+
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debugging outputs from generate_ibh in ib_transport_protocol.cpp
+	stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	stream<gibhPsnDebug>& tx_gibh_psn_debug,  
+
+	// Debugging outputs from prepend_ibh in ib_transport_protocol.cpp 
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+
+	stream<event>& tx_gexh_meta_debug, 
+	stream<ap_uint<4> >& tx_iumm_fire_debug,
+	stream<pibhDebug>& tx_pibh_fire_debug,
+	stream<pibhDebug>& tx_lrh_fire_debug,
+
+	// Debugging output from rx_ibh_fsm in ib_transport_protocol.cpp
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug,
+
+	// Debugging output from generate_exh in ib_transport_protocol.cpp
+	stream<ap_uint<4> >& tx_gexh_state_debug, 
+	stream<ap_uint<4> >& tx_gibh_state_debug,
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,
 
 	//Debug output
 #ifdef DBG_IBV
@@ -340,6 +460,22 @@ void rocev2_top(
 
 	#pragma HLS INTERFACE ap_none register port=local_ip_address
 
+	#pragma HLS INTERFACE axis register port=tx_ackEvent_debug
+	#pragma HLS INTERFACE axis register port=tx_ibhHeaderFifo_debug
+
+	// Definition of my own debugging ports
+	#pragma HLS INTERFACE axis register port=tx_gibh_opcode_debug
+	#pragma HLS INTERFACE axis register port=tx_gibh_psn_debug
+	#pragma HLS INTERFACE axis register port=tx_pibh_opcode_debug
+	#pragma HLS INTERFACE axis register port=tx_gexh_meta_debug
+	#pragma HLS INTERFACE axis register port=tx_iumm_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_pibh_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_lrh_fire_debug
+	#pragma HLS INTERFACE axis register port=tx_ibhfsm_metain_debug
+	#pragma HLS INTERFACE axis register port=tx_gexh_state_debug
+	#pragma HLS INTERFACE axis register port=tx_gibh_state_debug
+	#pragma HLS INTERFACE axis register port=tx_iumm_dstQpFifo_debug
+
 	//DEBUG
 #ifdef DBG_IBV
 	#pragma HLS INTERFACE axis register port=m_axis_dbg
@@ -363,6 +499,19 @@ void rocev2_top(
 		s_axis_qp_interface,
 		s_axis_qp_conn_interface,
 		local_ip_address,
+		tx_ackEvent_debug, 
+		tx_ibhHeaderFifo_debug, 
+		tx_gibh_opcode_debug, 
+		tx_gibh_psn_debug, 
+		tx_pibh_opcode_debug, 
+		tx_gexh_meta_debug, 
+		tx_iumm_fire_debug,
+		tx_pibh_fire_debug,
+		tx_lrh_fire_debug,
+		tx_ibhfsm_metain_debug,
+		tx_gexh_state_debug,
+		tx_gibh_state_debug,
+		tx_iumm_dstQpFifo_debug, 
 
 #ifdef DBG_IBV
 		m_axis_dbg,

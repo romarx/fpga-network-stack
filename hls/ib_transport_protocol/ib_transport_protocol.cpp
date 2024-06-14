@@ -332,7 +332,8 @@ void rx_ibh_fsm(
 	stream<psnPkg>& m_axis_dbg,
 #endif
 	// Counter for dropped packets
-	ap_uint<32>&		regInvalidPsnDropCount
+	ap_uint<32>&		regInvalidPsnDropCount, 
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -354,6 +355,8 @@ void rx_ibh_fsm(
 	// State of the QueuePair: Dealing with PSNs, retry counter etc. 
 	rxStateRsp qpState;
 
+	static ibhFsmMeta dbg_meta_input;
+
 
 	switch(fsmState)
 	{
@@ -364,6 +367,14 @@ void rx_ibh_fsm(
 			metaIn.read(meta);
 			exhMetaFifo.read(emeta);
 			isResponse = checkIfResponse(meta.op_code);
+			dbg_meta_input.counter = 1;
+			dbg_meta_input.op_code = meta.op_code;
+			dbg_meta_input.psn = meta.psn;
+			dbg_meta_input.expected_psn = meta.psn;
+			dbg_meta_input.valid_psn = meta.validPSN;
+			dbg_meta_input.isNak = emeta.isNak;
+			dbg_meta_input.num_pkg = emeta.numPkg;
+			tx_ibhfsm_metain_debug.write(dbg_meta_input);
 			stateTable_upd_req.write(rxStateReq(meta.dest_qp, isResponse));
 			fsmState = PROCESS;
 		}
@@ -394,10 +405,18 @@ void rx_ibh_fsm(
 				m_axis_dbg.write(psnPkg(0, meta.psn, qpState.epsn, meta.op_code));
 			#endif
 
+				dbg_meta_input.op_code = meta.op_code;
+				dbg_meta_input.psn = meta.psn;
+				dbg_meta_input.valid_psn = meta.validPSN;
+				dbg_meta_input.isNak = emeta.isNak;
+				dbg_meta_input.num_pkg = emeta.numPkg;
+				dbg_meta_input.expected_psn = qpState.epsn;
+
 				// Forwarding - Packet won't get dropped 
 				if (meta.op_code != RC_ACK && meta.op_code != RC_RDMA_READ_REQUEST) //TODO do length check instead
 				{
 					ibhDropFifo.write(false);
+					dbg_meta_input.counter = 2;
                 }
 				ibhDropMetaFifo.write(fwdPolicy(false, false));
 
@@ -411,7 +430,10 @@ void rx_ibh_fsm(
 				{
 					// if the next req is invalid, trigger NAK
 					stateTable_upd_req.write(rxStateReq(meta.dest_qp, meta.psn+emeta.numPkg, isResponse));
+					dbg_meta_input.counter = 3;
 				}
+							
+
 #ifdef RETRANS_EN
 
 				// Update oldest-unacked-reqeust
@@ -421,16 +443,19 @@ void rx_ibh_fsm(
 
                     // Retrans table update
 					rx2retrans_upd.write(retransUpdate(meta.dest_qp, meta.psn, meta.op_code));
+					dbg_meta_input.counter = 4;
 
                     if (meta.op_code != RC_RDMA_READ_RESP_FIRST && meta.op_code != RC_RDMA_READ_RESP_MIDDLE) {
                         // to flow control
                         m_axis_rx_ack_meta.write(ackMeta(meta.op_code == RC_ACK, meta.dest_qp, meta.psn));
+						dbg_meta_input.counter = 5;
                     }
 				}
 				// Check if no oustanding requests -> stop timer
 				if (isResponse && meta.op_code != RC_RDMA_READ_RESP_MIDDLE)
 				{
 					rxClearTimer_req.write(rxTimerUpdate(meta.dest_qp, meta.psn == qpState.max_forward));
+					dbg_meta_input.counter = 6;
 #ifndef __SYNTHESIS__
 					if (meta.psn  == qpState.max_forward)
 					{
@@ -439,6 +464,7 @@ void rx_ibh_fsm(
 #endif
 				}
 #endif
+				tx_ibhfsm_metain_debug.write(dbg_meta_input);	
 			}
 			// Check for duplicates - something's off with the psns, so that additional checks for duplicates must be executed 
 			// For response: epsn = old_unack, old_oustanding = old_valid
@@ -449,6 +475,13 @@ void rx_ibh_fsm(
 					m_axis_dbg.write(psnPkg(1, meta.psn, qpState.epsn, meta.op_code));
 				#endif
 
+				dbg_meta_input.op_code = meta.op_code;
+				dbg_meta_input.psn = meta.psn;
+				dbg_meta_input.valid_psn = meta.validPSN;
+				dbg_meta_input.isNak = emeta.isNak;
+				dbg_meta_input.num_pkg = emeta.numPkg;
+				dbg_meta_input.expected_psn = qpState.epsn;
+
 				// Read request re-execute
 				if (meta.op_code == RC_RDMA_READ_REQUEST)
 				{
@@ -457,6 +490,7 @@ void rx_ibh_fsm(
 					// Don't drop, pass on the BTH to the next module in line 
 					ibhDropMetaFifo.write(fwdPolicy(false, false));
 					metaOut.write(ibhMeta(meta.op_code, meta.partition_key, meta.dest_qp, meta.psn, meta.validPSN));
+					dbg_meta_input.counter = 7;
 					//No release required
 					//stateTable_upd_req.write(rxStateReq(meta.dest_qp, meta.psn, meta.partition_key, 0)); //TODO always +1??
 				}
@@ -469,6 +503,7 @@ void rx_ibh_fsm(
 					// Increment the drop counter 
 					droppedPackets++;
 					regInvalidPsnDropCount = droppedPackets;
+					dbg_meta_input.counter = 8;
 
 					// Write the Drop-Event to the other queues as well 
 					ibhDropFifo.write(true);
@@ -485,15 +520,26 @@ void rx_ibh_fsm(
 					if (meta.op_code != RC_ACK) //TODO do length check instead
 					{
 						ibhDropFifo.write(true);
+						dbg_meta_input.counter = 9;
 					} 
 					ibhDropMetaFifo.write(fwdPolicy(true, false));
+					dbg_meta_input.counter = 10;
 				}
+				tx_ibhfsm_metain_debug.write(dbg_meta_input);	
 			}
 			else // completely invalid - nothing to recover here
 			{
 				#ifdef DBG_IBV_IBH_FSM
 					m_axis_dbg.write(psnPkg(2, meta.psn, qpState.epsn, meta.op_code));
 				#endif
+
+				dbg_meta_input.op_code = meta.op_code;
+				dbg_meta_input.psn = meta.psn;
+				dbg_meta_input.valid_psn = meta.validPSN;
+				dbg_meta_input.isNak = emeta.isNak;
+				dbg_meta_input.num_pkg = emeta.numPkg;
+				dbg_meta_input.expected_psn = qpState.epsn;
+				dbg_meta_input.counter = 11;
 
 				// behavior, see page 313
 				std::cout << std::hex << "[RX IBH FSM " << INSTID << "]: dropping invalid psn " << meta.psn << " with retry " << qpState.retryCounter << std::endl;
@@ -1228,7 +1274,9 @@ void local_req_handler(
 	// Output to meta merger (tx_appMetaFifo), holds opcode, qpn, addr, length, psn, valid- and NAK-bit
 	stream<event>&tx_localTxMeta,
 	// Retransmitter counter, goes to generate_ibh
-    ap_uint<32>& regRetransCount)
+    ap_uint<32>& regRetransCount, 
+	// Debugging output to see when this module is firing
+	stream<pibhDebug>& tx_lrh_fire_debug)
 {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1244,6 +1292,9 @@ void local_req_handler(
 	retransEvent rev;
     static ap_uint<32> retransCount = 0;
 
+	// Word for generating debugging output 
+	pibhDebug fire_debug; 
+
 	// Bitfields of requests - local buffer address, remote buffer address, length of request, lst, offset
 	ap_uint<64> laddr;
 	ap_uint<64> raddr;
@@ -1258,6 +1309,9 @@ void local_req_handler(
 	if (!retransEventFifo.empty())
 	{
 		retransEventFifo.read(rev);
+		fire_debug.counter = 1; 
+		fire_debug.op_code = rev.op_code; 
+		tx_lrh_fire_debug.write(fire_debug); 
 		tx_localTxMeta.write(event(rev.op_code, rev.qpn, rev.remoteAddr, rev.length, rev.psn));
 
         retransCount++;
@@ -1267,7 +1321,7 @@ void local_req_handler(
 		if (rev.op_code != RC_RDMA_READ_REQUEST)
 		{
 			std::cout << "[LOCAL REQ HANDLER " << INSTID << "]: retranmission writing into memCmd with lengh " << rev.length << std::endl;
-			tx_local_memCmdFifo.write(memCmdInternal(rev.op_code, rev.qpn, rev.localAddr, rev.length, PKG_INT, rev.offs));
+			tx_local_memCmdFifo.write(memCmdInternal(rev.op_code, rev.qpn, rev.localAddr, rev.length, PKG_HOST, rev.offs));
 		} 
 
 	}
@@ -1301,6 +1355,9 @@ void local_req_handler(
 			meta.op_code == RC_RDMA_WRITE_LAST || meta.op_code == RC_RDMA_WRITE_ONLY || meta.op_code == RC_SEND_ONLY ||
             meta.op_code == RC_SEND_FIRST || meta.op_code == RC_SEND_MIDDLE || meta.op_code == RC_SEND_LAST)
 		{
+			fire_debug.counter = 2; 
+			fire_debug.op_code = meta.op_code; 
+			tx_lrh_fire_debug.write(fire_debug); 
 			tx_localTxMeta.write(event(meta.op_code, meta.qpn, raddr, length));
 			tx_local_memCmdFifo.write(memCmdInternal(meta.op_code, meta.qpn, laddr, length, meta.host));	
 		}
@@ -1544,7 +1601,10 @@ void meta_merger(
 	// Output of pre-set BTH, goes to generate_ibh
 	stream<ibhMeta>&	tx_ibhMetaFifo,
 	// Output of pre-set Extended Header, goes to generate_exh
-	stream<event>&		tx_exhMetaFifo
+	stream<event>&		tx_exhMetaFifo, 
+
+	// Debug-Output to show incoming ackEvents to the output 
+	stream<ackEvent>& tx_ackEvent_debug
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1560,10 +1620,14 @@ void meta_merger(
 	{
 		rx_ackEventFifo.read(aev);
 
+		tx_ackEvent_debug.write(ackEvent(1, aev.psn, aev.isNak)); 
 		tx_connTable_req.write(aev.qpn(15, 0));
+		tx_ackEvent_debug.write(ackEvent(2, aev.psn, aev.isNak)); 
 		// PSN used for read response
 		tx_ibhMetaFifo.write(ibhMeta(RC_ACK, key, aev.qpn, aev.psn, aev.validPsn));
+		tx_ackEvent_debug.write(ackEvent(3, aev.psn, aev.isNak)); 
 		tx_exhMetaFifo.write(event(aev));
+		tx_ackEvent_debug.write(ackEvent(4, aev.psn, aev.isNak)); 
 		std::cout << "[META MERGER " << INSTID << "]: reading from ack event with qpn " << aev.qpn << ", psn " << aev.psn << std::endl;
 	}
 
@@ -1631,7 +1695,15 @@ void generate_ibh(
 	stream<retransMeta>& tx2retrans_insertMeta,
 #endif
 	// Output-Fifo with the generated BTH, goes to prepend_ibh
-	stream<BaseTransportHeader<WIDTH> >& tx_ibhHeaderFifo
+	stream<BaseTransportHeader<WIDTH> >& tx_ibhHeaderFifo, 
+
+	// Debug Output of the generated BTH, gets channelled through to roce_stack 
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debug Output of the received meta-extractions op_code and psn 
+	stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	stream<gibhPsnDebug>& tx_gibh_psn_debug, 
+	stream<ap_uint<4> >& tx_gibh_state_debug
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1642,6 +1714,9 @@ void generate_ibh(
 
 	// Variable to generate the final BTH
 	static BaseTransportHeader<WIDTH> header;
+
+	// Variable for generating the psn-debug output 
+	static gibhPsnDebug psn_debug;
 
 	// Storage Variable to read the incoming BTH-meta information 
 	static ibhMeta meta;
@@ -1657,11 +1732,22 @@ void generate_ibh(
 	switch(gi_state)
 	{
 	case META:
+		tx_gibh_state_debug.write(1);
+
 		// If BTH and destination QP is available, fetch from the input queues and store
 		if (!metaIn.empty() && !dstQpIn.empty())
 		{
 			metaIn.read(meta);
 			dstQpIn.read(dstQp);
+
+			// Write Debug-Output 
+
+			tx_gibh_opcode_debug.write(meta.op_code); 
+
+			psn_debug.counter = 1;
+			psn_debug.psn = meta.psn;
+			tx_gibh_psn_debug.write(psn_debug); 
+
 			meta.partition_key = 0xFFFF; //TODO this is hard-coded, where does it come from??
 			header.clear();
 
@@ -1681,6 +1767,7 @@ void generate_ibh(
 			{
 				// If PSN is already valid, send out the packet to pretend_ibh
 				tx_ibhHeaderFifo.write(header);
+				tx_ibhHeaderFifo_debug.write(header.getOpCode()); 
 				std::cout << "[GENERATE IBH " << INSTID << "]: input meta, opcode 0x" << meta.op_code  << " valid psn " << std::hex << meta.psn << std::endl;
 			}
 			else
@@ -1692,6 +1779,8 @@ void generate_ibh(
 		}
 		break;
 	case GET_PSN:
+		tx_gibh_state_debug.write(2);
+
 		// Wait for the response from the state table 
 		if (!stateTable2txIbh_rsp.empty())
 		{
@@ -1701,6 +1790,10 @@ void generate_ibh(
 			{
 				// If it's an ACK, set the PSN
 				header.setPsn(qpState.resp_epsn-1); //TODO -1 necessary??
+
+				psn_debug.counter = 2;
+				psn_debug.psn = qpState.resp_epsn-1;
+				tx_gibh_psn_debug.write(psn_debug); 
 				std::cout << "[GENERATE IBH " << INSTID << "]: RC_ACK psn " << std::hex << qpState.resp_epsn-1 << std::endl;
 			}
 			else
@@ -1708,6 +1801,11 @@ void generate_ibh(
 				// Else: Set the PSN, request an ACK and update the PSN in the state table. 
 				header.setPsn(qpState.req_next_psn);
 				header.setAckReq(true);
+
+				psn_debug.counter = 3;
+				psn_debug.psn = qpState.req_next_psn;
+				tx_gibh_psn_debug.write(psn_debug);
+
 				//Update PSN
 				ap_uint<24> nextPsn = qpState.req_next_psn + meta.numPkg;
 				txIbh2stateTable_upd_req.write(txStateReq(meta.dest_qp, nextPsn));
@@ -1719,6 +1817,7 @@ void generate_ibh(
 				std::cout << "[GENERATE IBH " << INSTID << "]: generate header opcode 0x" << std::hex << meta.op_code << " psn " << qpState.req_next_psn << std::endl;
 			}
 			tx_ibhHeaderFifo.write(header);
+			tx_ibhHeaderFifo_debug.write(header.getOpCode()); 
 			gi_state = META;
 		}
 		break;
@@ -1761,7 +1860,11 @@ void generate_exh(
 	//stream<retransAddrLen>&		tx2retrans_insertAddrLen,
 #endif
 	// Output of the completely assembled Extended Header
-	stream<net_axis<WIDTH> >& output
+	stream<net_axis<WIDTH> >& output, 
+
+	stream<event>& tx_gexh_meta_debug, 
+
+	stream<ap_uint<4> >& tx_gexh_state_debug
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1794,6 +1897,7 @@ void generate_exh(
 	switch(ge_state)
 	{
 	case META:
+		tx_gexh_state_debug.write(1);
 		// Read the meta-information from the meta-merger 
 		if (!metaIn.empty())
 		{
@@ -1801,6 +1905,8 @@ void generate_exh(
 			ackHeader.clear();
 
 			metaIn.read(meta);
+			tx_gexh_meta_debug.write(meta); 
+
 			metaWritten = false;
 			//if (meta.op_code == RC_RDMA_READ_RESP_ONLY || meta.op_code == RC_RDMA_READ_RESP_FIRST || meta.op_code == RC_RDMA_READ_RESP_MIDDLE || meta.op_code == RC_RDMA_READ_RESP_LAST || meta.op_code == RC_ACK)
 			{
@@ -1825,6 +1931,7 @@ void generate_exh(
 		}
 		break;
 	case GET_MSN:
+		tx_gexh_state_debug.write(2);
 		// Wait for the input from the msn-table and store it in a variable for further processing
 		if (!msnTable2txExh_rsp.empty())
 		{
@@ -1834,6 +1941,7 @@ void generate_exh(
 		break;
 	case PROCESS:
 		{
+			tx_gexh_state_debug.write(3);
 			sendWord.last = 0;
 			switch(meta.op_code)
 			{
@@ -2208,7 +2316,11 @@ void prepend_ibh_header(
 	// Output for the combination of BTH, Extended Header and Payload
 	stream<net_axis<WIDTH> >& m_axis_tx_data,
 	// Counter for the outgoing packets 
-    ap_uint<32>&		regIbvCountTx
+    ap_uint<32>&		regIbvCountTx, 
+
+	// Debugging Output to show the header info arriving at this point 
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+	stream<pibhDebug>& tx_pibh_fire_debug
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -2219,6 +2331,7 @@ void prepend_ibh_header(
 	static ap_uint<WIDTH> headerData;
 	net_axis<WIDTH> currWord;
     static ap_uint<32> validTx = 0;
+	static pibhDebug fire_debug_word; 
 
 	switch (state)
 	{
@@ -2227,6 +2340,7 @@ void prepend_ibh_header(
 		if (!tx_ibhHeaderFifo.empty())
 		{
 			tx_ibhHeaderFifo.read(header);
+			tx_pibh_opcode_debug.write(header.getOpCode()); 
 			// Check if it's a full BTH or not - switch to the next state depending on that
 			if (BTH_SIZE >= WIDTH)
 			{
@@ -2253,6 +2367,9 @@ void prepend_ibh_header(
 		currWord.keep = ~0;
 		currWord.last = 0;
 		// Send out the read word 
+		fire_debug_word.counter = 1; 
+		fire_debug_word.op_code = header.getOpCode(); 
+		tx_pibh_fire_debug.write(fire_debug_word); 
 		m_axis_tx_data.write(currWord);
 
 		// Increase the counters for having processed a header
@@ -2275,6 +2392,9 @@ void prepend_ibh_header(
 #endif		
 			// Write out the received data
 			header.consumeWord(currWord.data);
+			fire_debug_word.counter = 2; 
+			fire_debug_word.op_code = header.getOpCode(); 
+			tx_pibh_fire_debug.write(fire_debug_word); 
 			m_axis_tx_data.write(currWord);
 
 			// Increment relevant counters 
@@ -2384,7 +2504,12 @@ void tx_ipUdpMetaMerger(
 	stream<ap_uint<16> >&	tx_lengthFifo,
 	// IP / UDP Meta Information Output 
 	stream<ipUdpMeta>&		m_axis_tx_meta,
-	stream<ap_uint<24> >&	tx_dstQpFifo
+	stream<ap_uint<24> >&	tx_dstQpFifo, 
+
+	// Debugging Outputs 
+	stream<ap_uint<4> >& tx_iumm_fire_debug, 
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug 
+
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -2394,12 +2519,16 @@ void tx_ipUdpMetaMerger(
 
 	if (!tx_connTable2ibh_rsp.empty() && !tx_lengthFifo.empty())
 	{
+		tx_iumm_fire_debug.write(1); 
 		// Read from the connection table and fetch required IP / UDP information to generate the IP / UDP header later on
 		tx_connTable2ibh_rsp.read(connMeta);
 		tx_lengthFifo.read(len);
 		std::cout << "[TX IP UDP META MERGER " << INSTID << "]: port " << connMeta.remote_udp_port << std::endl;
 		m_axis_tx_meta.write(ipUdpMeta(connMeta.remote_ip_address, RDMA_DEFAULT_PORT, connMeta.remote_udp_port, len));
+		tx_iumm_fire_debug.write(2); 
 		tx_dstQpFifo.write(connMeta.remote_qpn);
+		tx_iumm_dstQpFifo_debug.write(connMeta.remote_qpn);
+		tx_iumm_fire_debug.write(3); 
 	}
 }
 
@@ -2534,6 +2663,40 @@ void ib_transport_protocol(
 	// QP
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
+
+	// Ack Debugging 
+	stream<ackEvent>& tx_ackEvent_debug, 
+
+	// BTH Header Debugging 
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debugging Outputs from generate_ibh
+	stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	stream<gibhPsnDebug>& tx_gibh_psn_debug, 
+
+	// Debugging Output from prepend_ibh
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+
+	// Debugging Output from generate_exh 
+	stream<event>& tx_gexh_meta_debug, 
+
+	// Debugging Output from tx_ipUdpmetaMerger
+	stream<ap_uint<4> >& tx_iumm_fire_debug,
+	stream<pibhDebug>& tx_pibh_fire_debug, 
+
+	// Debugging Output from local_req_handler 
+	stream<pibhDebug>& tx_lrh_fire_debug, 
+
+	// Debugging Output from rx_ibh_fsm
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug, 
+
+	// State Debugging Output from generate_exh
+	stream<ap_uint<4> >& tx_gexh_state_debug, 
+
+	// State Debugging Output from generate_ibh
+	stream<ap_uint<4> >& tx_gibh_state_debug,
+
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,
 
 	// Debug
 #ifdef DBG_IBV
@@ -2872,7 +3035,8 @@ void ib_transport_protocol(
 #ifdef DBG_IBV_IBH_FSM
 		m_axis_dbg,
 #endif		
-		regInvalidPsnDropCount
+		regInvalidPsnDropCount, 
+		tx_ibhfsm_metain_debug
 	);
 
 	drop_ooo_ibh<WIDTH, INSTID>(
@@ -2963,7 +3127,8 @@ void ib_transport_protocol(
 		tx_localMemCmdFifo,
 		//tx_readReqAddr_push,
 		tx_appMetaFifo,
-        regRetransCount
+        regRetransCount, 
+		tx_lrh_fire_debug
 	);
 
 	tx_pkg_arbiter<WIDTH, INSTID>(	
@@ -2978,7 +3143,7 @@ void ib_transport_protocol(
 	stream_merger(tx_split2rethMerge, tx_appDataFifo, tx_rethMerge2rethShift);
 #endif
 	//merges and orders event going to TX path
-	meta_merger<INSTID>(rx_ackEventFifo, rx_readEvenFifo, tx_appMetaFifo, tx_ibhconnTable_req, tx_ibhMetaFifo, tx_exhMetaFifo);
+	meta_merger<INSTID>(rx_ackEventFifo, rx_readEvenFifo, tx_appMetaFifo, tx_ibhconnTable_req, tx_ibhMetaFifo, tx_exhMetaFifo, tx_ackEvent_debug);
 
 	//Shift playload by 4 bytes for AETH (data from memory)
 	lshiftWordByOctet<WIDTH,12,INSTID>(((AETH_SIZE%WIDTH)/8), tx_split2aethShift, tx_aethShift2payFifo);
@@ -2996,7 +3161,9 @@ void ib_transport_protocol(
 #ifdef RETRANS_EN
 		txSetTimer_req,
 #endif
-		tx_exh2payFifo
+		tx_exh2payFifo, 
+		tx_gexh_meta_debug, 
+		tx_gexh_state_debug
 	);
 
 	// Append payload to AETH or RETH
@@ -3012,14 +3179,18 @@ void ib_transport_protocol(
 #ifdef RETRANS_EN
 		tx2retrans_insertMeta,
 #endif
-		tx_ibhHeaderFifo
+		tx_ibhHeaderFifo, 
+		tx_ibhHeaderFifo_debug, 
+		tx_gibh_opcode_debug, 
+		tx_gibh_psn_debug, 
+		tx_gibh_state_debug
 	);
 
 	//prependt ib header
-	prepend_ibh_header<WIDTH, INSTID>(tx_ibhHeaderFifo, tx_shift2ibhFifo, m_axis_tx_data, regIbvCountTx);
+	prepend_ibh_header<WIDTH, INSTID>(tx_ibhHeaderFifo, tx_shift2ibhFifo, m_axis_tx_data, regIbvCountTx, tx_pibh_opcode_debug, tx_pibh_fire_debug);
 
 	//Get Meta data for UDP & IP layer
-	tx_ipUdpMetaMerger(tx_connTable2ibh_rsp, tx_lengthFifo, m_axis_tx_meta, tx_dstQpFifo);
+	tx_ipUdpMetaMerger(tx_connTable2ibh_rsp, tx_lengthFifo, m_axis_tx_meta, tx_dstQpFifo, tx_iumm_fire_debug, tx_iumm_dstQpFifo_debug);
 
 	//merge read requests
 	mem_cmd_merger<WIDTH>(rx_remoteMemCmd, tx_localMemCmdFifo, m_axis_mem_read_cmd, tx_pkgInfoFifo);
@@ -3108,6 +3279,19 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
 	stream<net_axis<DATA_WIDTH> >& s_axis_mem_read_data,		\
 	stream<qpContext>& s_axis_qp_interface,		               	\
 	stream<ifConnReq>& s_axis_qp_conn_interface,		        \
+	stream<ackEvent>& tx_ackEvent_debug, 						\
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug,				\
+	stream<ap_uint<8> >& tx_gibh_opcode_debug, 					\
+	stream<gibhPsnDebug>& tx_gibh_psn_debug, 					\
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 					\
+	stream<event>& tx_gexh_meta_debug,							\
+	stream<ap_uint<4> >& tx_iumm_fire_debug,					\
+	stream<pibhDebug>& tx_pibh_fire_debug, 						\
+	stream<pibhDebug>& tx_lrh_fire_debug,						\
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug, 				\ 
+	stream<ap_uint<4> >& tx_gexh_state_debug,					\
+	stream<ap_uint<4> >& tx_gibh_state_debug,					\
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,				\
 	stream<psnPkg>& m_axis_dbg,		                        	\
 	ap_uint<32>& regInvalidPsnDropCount,		                \
     ap_uint<32>& regRetransCount,		                        \
@@ -3129,6 +3313,19 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
 	stream<net_axis<DATA_WIDTH> >& s_axis_mem_read_data,		\
 	stream<qpContext>& s_axis_qp_interface,		               	\
 	stream<ifConnReq>& s_axis_qp_conn_interface,		        \
+	stream<ackEvent>& tx_ackEvent_debug, 						\
+	stream<ap_uint<8> >& tx_ibhHeaderFifo_debug,				\
+	stream<event>& tx_gexh_meta_debug,							\
+	stream<ap_uint<4> >& tx_iumm_fire_debug,					\
+	stream<ap_uint<8> > tx_gibh_opcode_debug, 					\
+	stream<gibhPsnDebug> tx_gibh_psn_debug, 					\
+	stream<ap_uint<8> >& tx_pibh_opcode_debug, 					\
+	stream<pibhDebug>& tx_pibh_fire_debug, 						\
+	stream<pibhDebug>& tx_lrh_fire_debug,						\
+	stream<ibhFsmMeta>& tx_ibhfsm_metain_debug, 				\
+	stream<ap_uint<4> >& tx_gexh_state_debug, 					\
+	stream<ap_uint<4> >& tx_gibh_state_debug, 					\
+	stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,				\
 	ap_uint<32>& regInvalidPsnDropCount,		                \
     ap_uint<32>& regRetransCount,		                        \
 	ap_uint<32>& regIbvCountRx,		                       	    \

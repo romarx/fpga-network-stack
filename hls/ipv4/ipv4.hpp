@@ -29,7 +29,6 @@
 #include "../axi_utils.hpp"
 #include "../packet.hpp"
 
-
 const uint32_t IPV4_HEADER_SIZE = 160;
 
 struct ipv4Meta
@@ -611,8 +610,6 @@ public:
 	ipv4Header()
 	{
 		header(7, 0) = 0x45; // version & IHL
-
-        // Was 0x40, had to be changed to 0x64 for RoCE-v2 compatibility
 		header(71, 64) = 0x64; // TTL
 	}
 
@@ -667,7 +664,6 @@ public:
 	}
 };
 
-// Renamed from ipv4_core to just ipv4
 template <int WIDTH>
 void ipv4(	hls::stream<net_axis<WIDTH> >&	s_axis_rx_data,
 			hls::stream<ipv4Meta>&	m_axis_rx_meta,

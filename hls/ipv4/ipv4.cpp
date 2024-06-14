@@ -24,8 +24,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "ipv4.hpp"
 #include "ipv4_config.hpp"
+#include "ipv4.hpp"
 
 template <int WIDTH>
 void process_ipv4(	stream<net_axis<WIDTH> >&		dataIn,
@@ -101,7 +101,7 @@ void generate_ipv4( stream<ipv4Meta>&		txEng_ipMetaDataFifoIn,
 			header.setSrcAddr(local_ipv4_address);
 			header.setProtocol(protocol);
 
-			// Set ECN and flags accordingly - added compared to previous version
+			// Set ECN and flags accordingly 
 			header.setECN(2);
 			header.setFlags(2);
 
@@ -191,7 +191,7 @@ void ipv4_generate_ipv4( stream<ipv4Meta>&		txEng_ipMetaDataFifoIn,
 			header.setSrcAddr(local_ipv4_address);
 			header.setProtocol(protocol);
 
-			// Set ECN and flags accordingly - added compared to previous
+			// Set ECN and flags accordingly 
 			header.setECN(1);
 			header.setFlags(1);
 
@@ -249,8 +249,8 @@ void ipv4_generate_ipv4( stream<ipv4Meta>&		txEng_ipMetaDataFifoIn,
 	}
 }
 
+#if defined( __VITIS_HLS__)
 template <int WIDTH>
-
 void ipv4(		hls::stream<net_axis<WIDTH> >&	s_axis_rx_data,
 				hls::stream<ipv4Meta>&		m_axis_rx_meta,
 				hls::stream<net_axis<WIDTH> >&	m_axis_rx_data,
@@ -332,7 +332,6 @@ void ipv4_top(		hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&	s_axis_rx_data,
 	convert_net_axis_to_axis<DATA_WIDTH>(m_axis_tx_data_internal, 
 							m_axis_tx_data);
 
-    // Name changed from ipv4_core to just ipv4
    	ipv4<DATA_WIDTH>(s_axis_rx_data_internal,
         m_axis_rx_meta,
         m_axis_rx_data_internal,
@@ -341,6 +340,76 @@ void ipv4_top(		hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&	s_axis_rx_data,
         m_axis_tx_data_internal,
         local_ipv4_address,
 		protocol);
+#else
+template <int WIDTH>
+void ipv4(		hls::stream<net_axis<WIDTH> >&	s_axis_rx_data,
+				hls::stream<ipv4Meta>&		m_axis_rx_meta,
+				hls::stream<net_axis<WIDTH> >&	m_axis_rx_data,
+				hls::stream<ipv4Meta>&		s_axis_tx_meta,
+				hls::stream<net_axis<WIDTH> >&	s_axis_tx_data,
+				hls::stream<net_axis<WIDTH> >&	m_axis_tx_data,
+				ap_uint<32>			local_ipv4_address,
+				ap_uint<8>			protocol)
+{
+#pragma HLS INLINE
+
+
+	/*
+	 * FIFOs
+	 */
+	static hls::stream<ap_uint<4> > rx_process2dropLengthFifo("rx_process2dropLengthFifo");
+	static hls::stream<net_axis<WIDTH> > rx_process2dropFifo("rx_process2dropFifo");
+	static hls::stream<net_axis<WIDTH> > tx_shift2ipv4Fifo("tx_shift2ipv4Fifo");
+	#pragma HLS STREAM depth=2 variable=rx_process2dropLengthFifo
+	#pragma HLS STREAM depth=8 variable=rx_process2dropFifo
+	#pragma HLS STREAM depth=8 variable=tx_shift2ipv4Fifo
+
+	/*
+	 * RX PATH
+	 */
+	process_ipv4(s_axis_rx_data, rx_process2dropLengthFifo, m_axis_rx_meta, rx_process2dropFifo);
+	//Assumes for WIDTH > 64 no optional fields
+	drop_optional_ip_header(rx_process2dropLengthFifo, rx_process2dropFifo, m_axis_rx_data);
+
+	/*
+	 * TX PATH
+	 */
+	lshiftWordByOctet<WIDTH, 2>(((IPV4_HEADER_SIZE%WIDTH)/8), s_axis_tx_data, tx_shift2ipv4Fifo);
+	generate_ipv4(s_axis_tx_meta, tx_shift2ipv4Fifo, m_axis_tx_data, local_ipv4_address, protocol);
+}
+
+void ipv4_top(		hls::stream<net_axis<DATA_WIDTH> >&	s_axis_rx_data,
+				hls::stream<ipv4Meta>&		m_axis_rx_meta,
+				hls::stream<net_axis<DATA_WIDTH> >&	m_axis_rx_data,
+				hls::stream<ipv4Meta>&		s_axis_tx_meta,
+				hls::stream<net_axis<DATA_WIDTH> >&	s_axis_tx_data,
+				hls::stream<net_axis<DATA_WIDTH> >&	m_axis_tx_data,
+				ap_uint<32>			local_ipv4_address,
+				ap_uint<8>			protocol)
+{
+#pragma HLS DATAFLOW disable_start_propagation
+#pragma HLS INTERFACE ap_ctrl_none register port=return
+
+#pragma HLS INTERFACE axis register port=s_axis_rx_data
+#pragma HLS INTERFACE axis register port=m_axis_rx_meta
+#pragma HLS INTERFACE axis register port=m_axis_rx_data
+#pragma HLS INTERFACE axis register port=s_axis_tx_meta
+#pragma HLS INTERFACE axis register port=s_axis_tx_data
+#pragma HLS INTERFACE axis register port=m_axis_tx_data
+#pragma HLS DATA_PACK variable=m_axis_rx_meta
+#pragma HLS DATA_PACK variable=s_axis_tx_meta
+#pragma HLS INTERFACE ap_stable register port=local_ipv4_address
+#pragma HLS INTERFACE ap_stable register port=protocol
+
+   ipv4<DATA_WIDTH>(s_axis_rx_data,
+        m_axis_rx_meta,
+        m_axis_rx_data,
+        s_axis_tx_meta,
+        s_axis_tx_data,
+        m_axis_tx_data,
+        local_ipv4_address,
+		protocol);
+#endif
 };
 
 

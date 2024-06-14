@@ -199,6 +199,22 @@ struct memCmdInternal
         : qpn(qpn), addr(addr), len(len), host(1), sync(0) {}
 };
 
+/* Debugging Data Struct for prepend_ibh */
+struct pibhDebug
+{
+	ap_uint<4> counter; 	// 4
+	ibOpCode op_code; 		// 8 
+};
+
+/* Debugging Data Struct for generate_ibh psn */
+struct gibhPsnDebug
+{
+	ap_uint<4> counter;		// 4 
+	ap_uint<24> psn;		// 24
+};
+
+
+
 /* Mem command */
 struct memCmd
 {
@@ -214,14 +230,14 @@ struct memCmd
 	memCmd() {}
 
 	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(pid), vfid(vfid) {}
+		:addr(addr), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(pid), vfid(vfid) {}
 	memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> host, ap_uint<24> qpn)
-        :addr(addr(64,0)), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(qpn(5,0)), vfid(qpn(9,6)) {}
+        :addr(addr), len(len), ctl(ctl), strm(addr(52,52)), sync(0), host(host), tdst(addr(51,48)), pid(qpn(5,0)), vfid(qpn(9,6)) {}
 
     memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<6> pid, ap_uint<4> vfid)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(pid), vfid(vfid) {}
+		:addr(addr), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(pid), vfid(vfid) {}
     memCmd(ap_uint<64> addr, ap_uint<28> len, ap_uint<1> ctl, ap_uint<1> sync, ap_uint<1> host, ap_uint<4> tdst, ap_uint<24> qpn)
-		:addr(addr(64,0)), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(qpn(5,0)), vfid(qpn(9,6)) {}
+		:addr(addr), len(len), ctl(ctl), strm(0), sync(sync), host(host), tdst(tdst), pid(qpn(5,0)), vfid(qpn(9,6)) {}
 };
 
 struct routedMemCmd
@@ -478,6 +494,18 @@ struct exhMeta
 		:isNak(isNak), numPkg(numPkg) {}
 };
 
+// Debugging packet for incoming meta-data in rx_ibh_fsm
+struct ibhFsmMeta
+{
+	ap_uint<4> counter;		// 4
+	ibOpCode op_code;		// 4
+	ap_uint<24> psn;		// 24
+	ap_uint<24> expected_psn; 	// 24
+	bool valid_psn;			// 1
+	bool isNak;				// 1
+	ap_uint<22> num_pkg;	// 22
+}; // 80 Bit 
+
 /**
  *  see page 167
  *	ap_uint<64> virtual_address;
@@ -650,10 +678,42 @@ void ib_transport_protocol(
 	// QP
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
+	hls::stream<ackEvent>& tx_ackEvent_debug, 
+	hls::stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debug Outputs from generate_ibh 
+	hls::stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	hls::stream<gibhPsnDebug>& tx_gibh_psn_debug, 
+
+	// Debug Outputs from prepend_ibh
+	hls::stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+
+	// Debug Outputs from generate_exh
+	hls::stream<event>& tx_gexh_meta_debug, 
+
+	// Debug Outputs from tx_ipUdpMetaMerger
+	hls::stream<ap_uint<4> >& tx_iumm_fire_debug,
+
+	// Debug Output from prepend_ibh to see firings
+	hls::stream<pibhDebug>& tx_pibh_fire_debug,
+
+	// Debug Output from local_req_handler 
+	hls::stream<pibhDebug>& tx_lrh_fire_debug,
+
+	// Debug Output from rx_ibh_fsm
+	hls::stream<ibhFsmMeta>& tx_ibhfsm_metain_debug,
+
+	// Debug Output from generate_exh
+	hls::stream<ap_uint<4> >& tx_gexh_state_debug, 
+
+	// Debug Output from generate_ibh
+	hls::stream<ap_uint<4> >& tx_gibh_state_debug,
+
+	hls::stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug,
 
 	// Debug
 #ifdef DBG_IBV
-	hls::stream<psnPkg>& m_axis_dbg_0, 
+	hls::stream<psnPkg>& m_axis_dbg, 
 #endif
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,

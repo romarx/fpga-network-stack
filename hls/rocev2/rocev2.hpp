@@ -64,6 +64,21 @@ void rocev2(
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	hls::stream<ackEvent>& tx_ackEvent_debug, 
+	hls::stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
+
+	// Debugging outputs from generate_ibh in ib_transport_protocol.cpp
+	hls::stream<ap_uint<8> >& tx_gibh_opcode_debug, 
+	hls::stream<gibhPsnDebug>& tx_gibh_psn_debug, 
+	hls::stream<ap_uint<8> >& tx_pibh_opcode_debug, 
+	hls::stream<event>& tx_gexh_meta_debug, 
+	hls::stream<ap_uint<4> >& tx_iumm_fire_debug,
+	hls::stream<pibhDebug>& tx_pibh_fire_debug, 
+	hls::stream<pibhDebug>& tx_lrh_fire_debug,
+	hls::stream<ibhFsmMeta>& tx_ibhfsm_metain_debug, 
+	hls::stream<ap_uint<4> >& tx_gexh_state_debug, 
+	hls::stream<ap_uint<4> >& tx_gibh_state_debug,
+	hls::stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug, 
 	
 	// Debug
 #ifdef DBG_IBV

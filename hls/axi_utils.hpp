@@ -32,7 +32,10 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#if defined( __VITIS_HLS__)
 #include "ap_axi_sdata.h"
+#endif
+
 //Adaptation of ap_axiu<>
 
 /*template <int D>
@@ -57,18 +60,7 @@ struct net_axis
 		:data(data), keep(keep), last(last) {}
 };
 
-template <int D, int R=1>
-struct routed_net_axis
-{
-	ap_uint<D>		data;
-	ap_uint<D/8>	keep;
-	ap_uint<1>		last;
-	ap_uint<R>		dest;
-	routed_net_axis() {}
-	routed_net_axis(net_axis<D> w, ap_uint<R> r)
-		:data(w.data), keep(w.keep), last(w.last), dest(r) {}
-};
-
+#if defined( __VITIS_HLS__)
 template <int WIDTH>
 void convert_net_axis_to_axis(hls::stream<net_axis<WIDTH> >& input,
 							hls::stream<ap_axiu<WIDTH, 0, 0, 0> >& output)
@@ -107,27 +99,7 @@ void convert_axis_to_net_axis(hls::stream<ap_axiu<WIDTH, 0, 0, 0> >& input,
 		output.write(outputWord);
 	}
 }
-
-template <int WIDTH, int DST=1>
-void convert_routed_net_axis_to_axis(hls::stream<routed_net_axis<WIDTH, DST> >& input,
-							hls::stream<ap_axiu<WIDTH, 0, 0, DST> >& output)
-{
-#pragma HLS pipeline II=1
-
-	routed_net_axis<WIDTH, DST> inputWord;
-	ap_axiu<WIDTH, 0, 0, DST> outputWord;
-
-	if (!input.empty())
-	{
-		inputWord = input.read();
-		outputWord.data = inputWord.data;
-		outputWord.keep = inputWord.keep;
-		outputWord.last = inputWord.last;
-		outputWord.dest = inputWord.dest;
-		output.write(outputWord);
-	}
-}
-
+#endif
 template<int D>
 ap_uint<D> reverse(const ap_uint<D>& w)
 {
@@ -254,7 +226,7 @@ void print(std::ostream& output, ap_uint<D> data)
 }
 
 template<int D>
-void print(__attribute__((unused)) std::ostream& output, __attribute__((unused)) net_axis<D>& word)
+void print(std::ostream& output, net_axis<D>& word)
 {
 #ifndef __SYNTHESIS__
 	output << std::hex;
@@ -269,7 +241,7 @@ void print(__attribute__((unused)) std::ostream& output, __attribute__((unused))
 }
 
 template<int D>
-void printLE(__attribute__((unused)) std::ostream& output, __attribute__((unused)) ap_uint<D>& data)
+void printLE(std::ostream& output, ap_uint<D>& data)
 {
 #ifndef __SYNTHESIS__
 	output << std::hex;
@@ -282,7 +254,7 @@ void printLE(__attribute__((unused)) std::ostream& output, __attribute__((unused
 }
 
 template<int D>
-void printLE(__attribute__((unused)) std::ostream& output, __attribute__((unused)) net_axis<D>& word)
+void printLE(std::ostream& output, net_axis<D>& word)
 {
 #ifndef __SYNTHESIS__
 	output << std::hex;
@@ -293,22 +265,6 @@ void printLE(__attribute__((unused)) std::ostream& output, __attribute__((unused
 	}
 	output << std::setw(D/8/4) << (uint64_t) word.keep << " ";
 	output << std::setw(1) << (uint16_t)word.last;
-#endif
-}
-
-template<int D, int R>
-void printLE(__attribute__((unused)) std::ostream& output, __attribute__((unused)) routed_net_axis<D, R>& word)
-{
-#ifndef __SYNTHESIS__
-	output << std::hex;
-	output << std::setfill('0') ;
-	for (int i = (D/8)-1; i >= 0; i--)
-	{
-		output << std::noshowbase << std::setw(2) << (uint16_t) word.data(i*8+7, i*8) << " ";
-	}
-	output << std::setw(D/8/4) << (uint64_t) word.keep << " ";
-	output << std::setw(1) << (uint16_t)word.last;
-	output << std::setw(R) << " TDEST:" << (uint16_t)word.dest;
 #endif
 }
 
@@ -471,19 +427,6 @@ void convertStreamWidth(hls::stream<net_axis<W> >& input, hls::stream<net_axis<W
 	reduceStreamWidth<W,8,DUMMY>(input, output);
 }
 
-
-template <class T>
-void assignDest(__attribute__((unused)) T& d, __attribute__((unused)) T& s) {}
-
-template <>
-void assignDest<routed_net_axis<64> >(routed_net_axis<64>& d, routed_net_axis<64>& s);
-template <>
-void assignDest<routed_net_axis<128> >(routed_net_axis<128>& d, routed_net_axis<128>& s);
-template <>
-void assignDest<routed_net_axis<256> >(routed_net_axis<256>& d, routed_net_axis<256>& s);
-template <>
-void assignDest<routed_net_axis<512> >(routed_net_axis<512>& d, routed_net_axis<512>& s);
-
 // The 2nd template parameter is a hack to use this function multiple times
 template <typename T, int W, int whatever, int INSTID = 0>
 void rshiftWordByOctet(	uint16_t offset,
@@ -525,7 +468,7 @@ void rshiftWordByOctet(	uint16_t offset,
 
 					sendWord.last = (currWord.keep((W/8-1), offset) == 0);
 					//sendWord.dest = currWord.dest;
-					assignDest(sendWord, currWord);
+					//assignDest(sendWord, currWord);
 				}//else offset
 				output.write(sendWord);
 			}
@@ -551,7 +494,7 @@ void rshiftWordByOctet(	uint16_t offset,
 		sendWord.keep((W/8-1), (W/8)-offset) = 0;
 		sendWord.last = 1;
 		//sendWord.dest = prevWord.dest;
-		assignDest(sendWord, currWord);
+		//assignDest(sendWord, currWord);
 
 		output.write(sendWord);
 		fsmState = PKG;
@@ -1340,7 +1283,7 @@ void ip_handler_rshiftWordByOctet(	uint16_t offset,
 
 					sendWord.last = (currWord.keep((W/8-1), offset) == 0);
 					//sendWord.dest = currWord.dest;
-					assignDest(sendWord, currWord);
+					//assignDest(sendWord, currWord);
 				}//else offset
 				output.write(sendWord);
 			}
@@ -1366,7 +1309,7 @@ void ip_handler_rshiftWordByOctet(	uint16_t offset,
 		sendWord.keep((W/8-1), (W/8)-offset) = 0;
 		sendWord.last = 1;
 		//sendWord.dest = prevWord.dest;
-		assignDest(sendWord, currWord);
+		//assignDest(sendWord, currWord);
 
 		output.write(sendWord);
 		fsmState = PKG;
@@ -1415,7 +1358,7 @@ void udp_rshiftWordByOctet(	uint16_t offset,
 
 					sendWord.last = (currWord.keep((W/8-1), offset) == 0);
 					//sendWord.dest = currWord.dest;
-					assignDest(sendWord, currWord);
+					//assignDest(sendWord, currWord);
 				}//else offset
 				output.write(sendWord);
 			}
@@ -1441,7 +1384,7 @@ void udp_rshiftWordByOctet(	uint16_t offset,
 		sendWord.keep((W/8-1), (W/8)-offset) = 0;
 		sendWord.last = 1;
 		//sendWord.dest = prevWord.dest;
-		assignDest(sendWord, currWord);
+		//assignDest(sendWord, currWord);
 
 		output.write(sendWord);
 		fsmState = PKG;
