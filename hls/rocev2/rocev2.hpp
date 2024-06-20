@@ -46,7 +46,7 @@ typedef ipv4Meta ipMeta;
 template <int WIDTH, int INSTID>
 void rocev2(
 	hls::stream<net_axis<WIDTH> >& s_axis_rx_data,
-	hls::stream<net_axis<WIDTH> >&	m_axis_tx_data,
+	hls::stream<net_axis<WIDTH> >& m_axis_tx_data,
 
 	// S(R)Q
 	hls::stream<txMeta>& s_axis_sq_meta,

@@ -27,7 +27,6 @@
  */
 
 #include "../axi_utils.hpp"
-#include "../fns_config.hpp"
 
 struct arpTableReply
 {
@@ -39,7 +38,7 @@ struct arpTableReply
 };
 
 template <int WIDTH>
-void mac_ip_encode_core( hls::stream<net_axis<WIDTH> >&			dataIn,
+void mac_ip_encode( hls::stream<net_axis<WIDTH> >&			dataIn,
 					hls::stream<arpTableReply>&		arpTableIn,
 					hls::stream<net_axis<WIDTH> >&			dataOut,
 					hls::stream<ap_uint<32> >&		arpTableOut,
