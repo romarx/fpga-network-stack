@@ -32,43 +32,27 @@
 
 template <int WIDTH>
 void extract_ip_address(hls::stream<net_axis<WIDTH> >&		dataIn,
-						hls::stream<net_axis<WIDTH> >&		dataOut,
-						hls::stream<ap_uint<32> >&	arpTableOut,
-						ap_uint<32>					regSubNetMask,
-						ap_uint<32>					regDefaultGateway)
+						hls::stream<net_axis<WIDTH> >&		dataOut)
+						
 
 {
 	#pragma HLS PIPELINE II=1
 	#pragma HLS INLINE off
 
 	static ipv4Header<WIDTH> header;
-	static bool metaWritten = false;
+
 
 	if (!dataIn.empty())
 	{
 		net_axis<WIDTH> currWord = dataIn.read();
 		header.parseWord(currWord.data);
 		dataOut.write(currWord);
-
-		if (header.isReady() && !metaWritten)
-		{
-			ap_uint<32> dstIpAddress = header.getDstAddr();
-			if ((dstIpAddress & regSubNetMask) == (regDefaultGateway & regSubNetMask))
-			{
-				arpTableOut.write(dstIpAddress);
-			}
-			else
-			{
-				arpTableOut.write(regDefaultGateway);
-			}
-			metaWritten = true;
-		}
-
+		
 		if (currWord.last)
 		{
-			metaWritten = false;
 			header.clear();
 		}
+	
 	}
 }
 
@@ -135,52 +119,40 @@ void insert_ip_checksum(hls::stream<net_axis<WIDTH> >&		dataIn,
 }
 
 template <int WIDTH>
-void handle_arp_reply (	hls::stream<arpTableReply>&		arpTableIn,
-						hls::stream<net_axis<WIDTH> >&	dataIn,
+void create_ethernet_header (hls::stream<net_axis<WIDTH> >&	dataIn,
 						hls::stream<ethHeader<WIDTH> >&	headerOut,
 						hls::stream<net_axis<WIDTH> >&	dataOut,
-						ap_uint<48>					myMacAddress)
+						ap_uint<48>					myMacAddress,
+						ap_uint<48>					theirMacAddress)
 
 {
 	#pragma HLS PIPELINE II=1
 	#pragma HLS INLINE off
 
-	enum fsmStateType {ARP, FWD, DROP};
-	static fsmStateType har_state = ARP;
+	enum fsmStateType {HDR, FWD};
+	static fsmStateType hdr_state = HDR;
 
-	switch (har_state)
+	switch (hdr_state)
 	{
-	case ARP:
-		if (!arpTableIn.empty() && !dataIn.empty())
-		{
-			arpTableReply reply = arpTableIn.read();
+	case HDR:
+		if (!dataIn.empty()){
+			
 			net_axis<WIDTH> word = dataIn.read();
 
-			if (reply.hit)
-			{
-				//Construct Header
-				ethHeader<WIDTH> header;
-				header.clear();
-				header.setDstAddress(reply.macAddress);
-				header.setSrcAddress(myMacAddress);
-				header.setEthertype(0x0800);
-				headerOut.write(header);
-
-				dataOut.write(word);
-
-				if (!word.last)
-				{
-					har_state = FWD;
-				}
-			}
-			else
-			{
-				if (!word.last)
-				{
-					har_state = DROP;
-				}
-			}
+			//Construct Header
+			ethHeader<WIDTH> header;
+			header.clear();
+			header.setDstAddress(theirMacAddress);
+			header.setSrcAddress(myMacAddress);
+			header.setEthertype(0x0800);
 			
+			headerOut.write(header);
+			dataOut.write(word);
+
+			if (!word.last)
+			{
+				hdr_state = FWD;
+			}
 		}
 		break;
 	case FWD:
@@ -190,17 +162,7 @@ void handle_arp_reply (	hls::stream<arpTableReply>&		arpTableIn,
 			dataOut.write(word);
 			if (word.last)
 			{
-				har_state = ARP;
-			}
-		}
-		break;
-	case DROP:
-		if (!dataIn.empty())
-		{
-			net_axis<WIDTH> word = dataIn.read();
-			if (word.last)
-			{
-				har_state = ARP;
+				hdr_state = HDR;
 			}
 		}
 		break;
@@ -273,105 +235,10 @@ void insert_ethernet_header(hls::stream<ethHeader<WIDTH> >&		headerIn,
 }
 
 template <int WIDTH>
-void generate_ethernet(	hls::stream<net_axis<WIDTH> >&		dataIn,
-						hls::stream<arpTableReply>&	arpTableIn,
-						hls::stream<net_axis<WIDTH> >&		dataOut,
-						ap_uint<48>					myMacAddress)
-{
-	#pragma HLS PIPELINE II=1
-	#pragma HLS INLINE off
-
-	enum fsmStateType {META, HEADER, PARTIAL_HEADER, BODY, DROP};
-	static fsmStateType ge_state=META;
-	static ethHeader<WIDTH> header;
-
-	arpTableReply reply;
-
-	switch (ge_state)
-	{
-	case META:
-		if (!arpTableIn.empty())
-		{
-			arpTableIn.read(reply);
-			header.clear();
-
-			if (reply.hit)
-			{
-				header.setDstAddress(reply.macAddress);
-				header.setSrcAddress(myMacAddress);
-				header.setEthertype(0x0800);
-				if (ETH_HEADER_SIZE >= WIDTH)
-				{
-					ge_state = HEADER;
-				}
-				else
-				{
-					ge_state = PARTIAL_HEADER;
-				}
-			}
-			else
-			{
-				ge_state = DROP;
-			}
-		}
-		break;
-	case HEADER:
-	{
-		net_axis<WIDTH> currWord;
-		if (header.consumeWord(currWord.data) < (WIDTH/8))
-		{
-			ge_state = PARTIAL_HEADER;
-		}
-		currWord.keep = ~0;
-		currWord.last = 0;
-		dataOut.write(currWord);
-		break;
-	}
-	case PARTIAL_HEADER:
-		if (!dataIn.empty())
-		{
-			net_axis<WIDTH> currWord = dataIn.read();
-			header.consumeWord(currWord.data);
-			dataOut.write(currWord);
-			ge_state = BODY;
-			if (currWord.last)
-			{
-				ge_state = META;
-			}
-		}
-		break;
-	case BODY:
-		if (!dataIn.empty())
-		{
-			net_axis<WIDTH> currWord = dataIn.read();
-			dataOut.write(currWord);
-			if (currWord.last)
-			{
-				ge_state = META;
-			}
-		}
-		break;
-	case DROP:
-		if (!dataIn.empty())
-		{
-			net_axis<WIDTH> currWord = dataIn.read();
-			if (currWord.last)
-			{
-				ge_state = META;
-			}
-		}
-		break;
-	}//switch
-}
-
-template <int WIDTH>
 void mac_ip_encode( hls::stream<net_axis<WIDTH> >&			dataIn,
-					hls::stream<arpTableReply>&		arpTableIn,
 					hls::stream<net_axis<WIDTH> >&			dataOut,
-					hls::stream<ap_uint<32> >&		arpTableOut,
 					ap_uint<48>					myMacAddress,
-					ap_uint<32>					regSubNetMask,
-					ap_uint<32>					regDefaultGateway)
+					ap_uint<48>					theirMacAddress)
 {
 	#pragma HLS INLINE
 
@@ -410,54 +277,47 @@ void mac_ip_encode( hls::stream<net_axis<WIDTH> >&			dataIn,
 #if defined( __VITIS_HLS__)
 	#pragma HLS aggregate  variable=headerFifo compact=bit
 
-	extract_ip_address(dataIn, dataStreamBuffer0, arpTableOut, regSubNetMask, regDefaultGateway);
+	//extract_ip_address(dataIn, dataStreamBuffer0);
 
-	mac_compute_ipv4_checksum(dataStreamBuffer0, dataStreamBuffer1, subSumFifo, true);
+	mac_compute_ipv4_checksum(dataIn, dataStreamBuffer1, subSumFifo, true);
 	mac_finalize_ipv4_checksum<WIDTH/16>(subSumFifo, checksumFifo);
 
 	insert_ip_checksum(dataStreamBuffer1, checksumFifo, dataStreamBuffer2);
 
-	handle_arp_reply(arpTableIn, dataStreamBuffer2, headerFifo, dataStreamBuffer3, myMacAddress);
+	create_ethernet_header(dataStreamBuffer2, headerFifo, dataStreamBuffer3, myMacAddress, theirMacAddress);
 	mac_lshiftWordByOctet<WIDTH, 1>(((ETH_HEADER_SIZE%WIDTH)/8), dataStreamBuffer3, dataStreamBuffer4);
 	insert_ethernet_header(headerFifo, dataStreamBuffer4, dataOut);
 #else
 	#pragma HLS DATA_PACK variable=headerFifo
-	extract_ip_address(dataIn, dataStreamBuffer0, arpTableOut, regSubNetMask, regDefaultGateway);
+	//extract_ip_address(dataIn, dataStreamBuffer0);
 	
-	compute_ipv4_checksum(dataStreamBuffer0, dataStreamBuffer1, subSumFifo, true);
+	compute_ipv4_checksum(dataIn, dataStreamBuffer1, subSumFifo, true);
 	finalize_ipv4_checksum<WIDTH/16>(subSumFifo, checksumFifo);
 
 	insert_ip_checksum(dataStreamBuffer1, checksumFifo, dataStreamBuffer2);
 
-	handle_arp_reply(arpTableIn, dataStreamBuffer2, headerFifo, dataStreamBuffer3, myMacAddress);
+	create_ethernet_header(arpTableIn, dataStreamBuffer2, headerFifo, dataStreamBuffer3, myMacAddress, theirMacAddress);
 	lshiftWordByOctet<WIDTH, 1>(((ETH_HEADER_SIZE%WIDTH)/8), dataStreamBuffer3, dataStreamBuffer4);
 	insert_ethernet_header(headerFifo, dataStreamBuffer4, dataOut);
 #endif
-	//generate_ethernet(dataStreamBuffer3, arpTableIn, dataOut, myMacAddress);
+	
 }
 
 #if defined( __VITIS_HLS__)
 void mac_ip_encode_top( hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&			dataIn,
-					hls::stream<arpTableReply>&		arpTableIn,
 					hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&			dataOut,
-					hls::stream<ap_uint<32> >&		arpTableOut,
 					ap_uint<48>					myMacAddress,
-					ap_uint<32>					regSubNetMask,
-					ap_uint<32>					regDefaultGateway)
+					ap_uint<48>					theirMacAddress)
 {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
 
 	#pragma HLS INTERFACE axis register port=dataIn name=s_axis_ip
 	#pragma HLS INTERFACE axis register port=dataOut name=m_axis_ip
-	#pragma HLS INTERFACE axis register port=arpTableIn name=s_axis_arp_lookup_reply
-	#pragma HLS INTERFACE axis register port=arpTableOut name=m_axis_arp_lookup_request
 
-	#pragma HLS aggregate  variable=arpTableIn compact=bit
-
+	#pragma HLS INTERFACE ap_none register port=theirMacAddress
 	#pragma HLS INTERFACE ap_none register port=myMacAddress
-	#pragma HLS INTERFACE ap_none register port=regSubNetMask
-	#pragma HLS INTERFACE ap_none register port=regDefaultGateway
+
 
 	static hls::stream<net_axis<DATA_WIDTH> > dataIn_internal;
 	#pragma HLS STREAM depth=2 variable=dataIn_internal
@@ -471,41 +331,29 @@ void mac_ip_encode_top( hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&			dataIn,
 							dataOut);
 
    	mac_ip_encode<DATA_WIDTH>( dataIn_internal,
-                              arpTableIn,
                               dataOut_internal,
-                              arpTableOut,
                               myMacAddress,
-                              regSubNetMask,
-                              regDefaultGateway);
+							  theirMacAddress);
 #else
 void mac_ip_encode_top( hls::stream<net_axis<DATA_WIDTH> >&			dataIn,
-					hls::stream<arpTableReply>&		arpTableIn,
 					hls::stream<net_axis<DATA_WIDTH> >&			dataOut,
-					hls::stream<ap_uint<32> >&		arpTableOut,
 					ap_uint<48>					myMacAddress,
-					ap_uint<32>					regSubNetMask,
-					ap_uint<32>					regDefaultGateway)
+					ap_uint<48>					theirMacAddress)
 {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
 
 	#pragma HLS INTERFACE axis register port=dataIn name=s_axis_ip
 	#pragma HLS INTERFACE axis register port=dataOut name=m_axis_ip
-	#pragma HLS INTERFACE axis register port=arpTableIn name=s_axis_arp_lookup_reply
-	#pragma HLS INTERFACE axis register port=arpTableOut name=m_axis_arp_lookup_request
 
-	#pragma HLS DATA_PACK variable=arpTableIn
 
+	#pragma HLS INTERFACE ap_stable register port=theirMacAddress
 	#pragma HLS INTERFACE ap_stable register port=myMacAddress
-	#pragma HLS INTERFACE ap_stable register port=regSubNetMask
-	#pragma HLS INTERFACE ap_stable register port=regDefaultGateway
+
 
    mac_ip_encode<DATA_WIDTH>( dataIn,
-                              arpTableIn,
                               dataOut,
-                              arpTableOut,
                               myMacAddress,
-                              regSubNetMask,
-                              regDefaultGateway);
+							  theirMacAddress);
 #endif
 }
