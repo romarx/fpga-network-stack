@@ -24,8 +24,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "udp.hpp"
 #include "udp_config.hpp"
+#include "udp.hpp"
 
 template <int WIDTH>
 void process_udp(	stream<net_axis<WIDTH> >& input,
@@ -197,8 +197,6 @@ void merge_rx_meta(	stream<ipMeta>&		ipMetaIn,
 
 
 template <int WIDTH>
-
-// Renamed from udp_core to just udp
 void udp(		hls::stream<ipMeta>&		s_axis_rx_meta,
 				hls::stream<net_axis<WIDTH> >&	s_axis_rx_data,
 				hls::stream<ipUdpMeta>&	m_axis_rx_meta,
@@ -221,7 +219,11 @@ void udp(		hls::stream<ipMeta>&		s_axis_rx_meta,
 	static hls::stream<udpMeta>	rx_udpMetaFifo("rx_udpMetaFifo");
 	#pragma HLS STREAM depth=2 variable=rx_udp2shiftFifo
 	#pragma HLS STREAM depth=2 variable=rx_udpMetaFifo
+#if defined( __VITIS_HLS__)
 	#pragma HLS aggregate  variable=rx_udpMetaFifo compact=bit
+#else
+	#pragma HLS DATA_PACK variable=rx_udpMetaFifo
+#endif
 
 	process_udp<WIDTH>(s_axis_rx_data, rx_udpMetaFifo, rx_udp2shiftFifo, reg_listen_port);
 	udp_rshiftWordByOctet<net_axis<WIDTH>, WIDTH, 2>(((UDP_HEADER_SIZE%WIDTH)/8), rx_udp2shiftFifo, m_axis_rx_data);
@@ -245,8 +247,8 @@ void udp(		hls::stream<ipMeta>&		s_axis_rx_meta,
 	generate_udp<WIDTH>(tx_udpMetaFifo, tx_shift2udpFifo, m_axis_tx_data);
 }
 
-// renamed from udp to udp_top
 void udp_top(
+#if defined( __VITIS_HLS__)
 	hls::stream<ipMeta>&		s_axis_rx_meta,
 	hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&	s_axis_rx_data,
 	hls::stream<ipUdpMeta>&	m_axis_rx_meta,
@@ -257,6 +259,18 @@ void udp_top(
 	hls::stream<ap_axiu<DATA_WIDTH, 0, 0, 0> >&	m_axis_tx_data,
 	ap_uint<128>		reg_ip_address,
 	ap_uint<16>			reg_listen_port)
+#else
+	hls::stream<ipMeta>&		s_axis_rx_meta,
+	hls::stream<net_axis<DATA_WIDTH> >&	s_axis_rx_data,
+	hls::stream<ipUdpMeta>&	m_axis_rx_meta,
+	hls::stream<net_axis<DATA_WIDTH> >&	m_axis_rx_data,
+	hls::stream<ipUdpMeta>&	s_axis_tx_meta,
+	hls::stream<net_axis<DATA_WIDTH> >&	s_axis_tx_data,
+	hls::stream<ipMeta>&		m_axis_tx_meta,
+	hls::stream<net_axis<DATA_WIDTH> >&	m_axis_tx_data,
+	ap_uint<128>		reg_ip_address,
+	ap_uint<16>			reg_listen_port)
+#endif
 {
 #pragma HLS DATAFLOW disable_start_propagation
 #pragma HLS INTERFACE ap_ctrl_none port=return
@@ -269,6 +283,7 @@ void udp_top(
 #pragma HLS INTERFACE axis register port=s_axis_tx_data
 #pragma HLS INTERFACE axis register port=m_axis_tx_meta
 #pragma HLS INTERFACE axis register port=m_axis_tx_data
+#if defined( __VITIS_HLS__)
 #pragma HLS aggregate  variable=s_axis_rx_meta compact=bit
 #pragma HLS aggregate  variable=m_axis_rx_meta compact=bit
 #pragma HLS aggregate  variable=s_axis_tx_meta compact=bit
@@ -297,7 +312,6 @@ void udp_top(
 	convert_net_axis_to_axis<DATA_WIDTH>(m_axis_tx_data_internal,
 							m_axis_tx_data);
 
-    // Renamed from udp_core to just udp
    	udp<DATA_WIDTH>(s_axis_rx_meta,
                    s_axis_rx_data_internal,
                    m_axis_rx_meta,
@@ -308,4 +322,25 @@ void udp_top(
                    m_axis_tx_data_internal,
                    reg_ip_address,
                    reg_listen_port);
+#else
+#pragma HLS DATA_PACK variable=s_axis_rx_meta
+#pragma HLS DATA_PACK variable=m_axis_rx_meta
+#pragma HLS DATA_PACK variable=s_axis_tx_meta
+#pragma HLS DATA_PACK variable=m_axis_tx_meta
+#pragma HLS INTERFACE ap_stable register port=reg_ip_address
+#pragma HLS INTERFACE ap_stable register port=reg_listen_port
+
+
+   udp<DATA_WIDTH>(s_axis_rx_meta,
+                   s_axis_rx_data,
+                   m_axis_rx_meta,
+                   m_axis_rx_data,
+                   s_axis_tx_meta,
+                   s_axis_tx_data,
+                   m_axis_tx_meta,
+                   m_axis_tx_data,
+                   reg_ip_address,
+                   reg_listen_port);
+#endif
 }
+

@@ -27,7 +27,6 @@
 #pragma once
 
 #define IP_VERSION 4
-// #define RETRANS_EN
 
 #include "../axi_utils.hpp"
 #include "../ipv4/ipv4.hpp"
@@ -46,7 +45,7 @@ typedef ipv4Meta ipMeta;
 template <int WIDTH, int INSTID>
 void rocev2(
 	hls::stream<net_axis<WIDTH> >& s_axis_rx_data,
-	hls::stream<net_axis<WIDTH> >& m_axis_tx_data,
+	hls::stream<net_axis<WIDTH> >&	m_axis_tx_data,
 
 	// S(R)Q
 	hls::stream<txMeta>& s_axis_sq_meta,
@@ -64,25 +63,12 @@ void rocev2(
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
-	hls::stream<ackEvent>& tx_ackEvent_debug, 
-	hls::stream<ap_uint<8> >& tx_ibhHeaderFifo_debug, 
-
-	// Debugging outputs from generate_ibh in ib_transport_protocol.cpp
-	hls::stream<ap_uint<8> >& tx_gibh_opcode_debug, 
-	hls::stream<gibhPsnDebug>& tx_gibh_psn_debug, 
-	hls::stream<ap_uint<8> >& tx_pibh_opcode_debug, 
-	hls::stream<event>& tx_gexh_meta_debug, 
-	hls::stream<ap_uint<4> >& tx_iumm_fire_debug,
-	hls::stream<pibhDebug>& tx_pibh_fire_debug, 
-	hls::stream<pibhDebug>& tx_lrh_fire_debug,
-	hls::stream<ibhFsmMeta>& tx_ibhfsm_metain_debug, 
-	hls::stream<ap_uint<4> >& tx_gexh_state_debug, 
-	hls::stream<ap_uint<4> >& tx_gibh_state_debug,
-	hls::stream<ap_uint<24> >& tx_iumm_dstQpFifo_debug, 
 	
 	// Debug
 #ifdef DBG_IBV
-	hls::stream<psnPkg>& m_axis_dbg,
+	hls::stream<psnPkg>& m_axis_dbg_0,
+    hls::stream<psnPkg>& m_axis_dbg_1,
+    hls::stream<psnPkg>& m_axis_dbg_2,
 #endif 
 	ap_uint<32>& regCrcDropPkgCount,
 	ap_uint<32>& regInvalidPsnDropCount,

@@ -1,9 +1,6 @@
 /************************************************
 Copyright (c) 2019, Systems Group, ETH Zurich.
 All rights reserved.
-/************************************************
-Copyright (c) 2019, Systems Group, ETH Zurich.
-All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -436,7 +433,7 @@ void compute_crc32(	stream<net_axis<WIDTH> >& input,
 template <int WIDTH, int INSTID = 0>
 void insert_icrc(
 #ifndef DISABLE_CRC_CALCULATION
-					stream<ap_uint<32> >& crcIn,
+					stream<ap_uint<32> >& crc,
 #endif
 					stream<net_axis<WIDTH> >& input,
 					stream<net_axis<WIDTH> >& output)
@@ -460,9 +457,9 @@ void insert_icrc(
 	{
 #ifndef DISABLE_CRC_CALCULATION
 	case CRC:
-		if (!crcIn.empty())
+		if (!crc.empty())
 		{
-			crcIn.read(crc);
+			crc.read(crc);
             std::cout << "[ NODE: " << INSTID << ", INSERT_CRC() ]:  CRC " << std::hex << crc  << std::dec << std::endl;
 			crc = ~crc;
 			ii_state = FWD;
