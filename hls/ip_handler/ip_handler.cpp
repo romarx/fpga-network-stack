@@ -43,13 +43,14 @@ void detect_eth_protocol(	hls::stream<net_axis<WIDTH> >&	dataIn,
 
 	static ethHeader<WIDTH> header;
 	static bool metaWritten = false;
+	net_axis<WIDTH> currWord;
 
 	if (!dataIn.empty())
 	{
-		net_axis<WIDTH> word = dataIn.read();
-		header.parseWord(word.data);
+		currWord = dataIn.read();
+		header.parseWord(currWord.data);
 		std::cout << "DETECT ETH: ";
-		printLE(std::cout, word);
+		printLE(std::cout, currWord);
 		std::cout << std::endl;
 		if (header.isReady() && !metaWritten)
 		{
@@ -58,8 +59,8 @@ void detect_eth_protocol(	hls::stream<net_axis<WIDTH> >&	dataIn,
 			metaWritten = true;
 		}
 
-		dataOut.write(word);
-		if (word.last)
+		dataOut.write(currWord);
+		if (currWord.last)
 		{
 			header.clear();
 			metaWritten = false;
@@ -78,6 +79,7 @@ void route_by_eth_protocol(	hls::stream<ap_uint<16> >&	etherTypeFifoIn,
 
 	static ap_uint<1> rep_fsmState = 0;
 	static ap_uint<16> rep_etherType;
+	net_axis<WIDTH> currWord;
 
 	switch (rep_fsmState)
 	{
@@ -85,12 +87,12 @@ void route_by_eth_protocol(	hls::stream<ap_uint<16> >&	etherTypeFifoIn,
 		if (!etherTypeFifoIn.empty() && !dataIn.empty())
 		{
 			rep_etherType = etherTypeFifoIn.read();
-			net_axis<WIDTH> word = dataIn.read();
+			currWord = dataIn.read();
 			if (rep_etherType == IPv4 && WIDTH > 64)
 			{
-				IPdataOut.write(word);
+				IPdataOut.write(currWord);
 			}
-			if (!word.last)
+			if (!currWord.last)
 			{
 				rep_fsmState = 1;
 			}
@@ -99,13 +101,13 @@ void route_by_eth_protocol(	hls::stream<ap_uint<16> >&	etherTypeFifoIn,
 	case 1:
 		if (!dataIn.empty())
 		{
-			net_axis<WIDTH> word = dataIn.read();
+			currWord = dataIn.read();
 			if (rep_etherType == IPv4)
 			{
-				IPdataOut.write(word);
+				IPdataOut.write(currWord);
 			}
 
-			if (word.last)
+			if (currWord.last)
 			{
 				rep_fsmState = 0;
 			}
@@ -126,10 +128,11 @@ void extract_ip_meta(hls::stream<net_axis<WIDTH> >&		dataIn,
 
 	static ipv4Header<WIDTH> header;
 	static bool metaWritten = false;
+	net_axis<WIDTH> currWord;
 
 	if (!dataIn.empty())
 	{
-		net_axis<WIDTH> currWord = dataIn.read();
+		currWord = dataIn.read();
 		header.parseWord(currWord.data);
 		dataOut.write(currWord);
 
@@ -168,6 +171,7 @@ void ip_invalid_dropper(hls::stream<net_axis<WIDTH> >&		dataIn,
 
 	enum iid_StateType {GET_VALID, FWD, DROP};
 	static iid_StateType iid_state = GET_VALID;
+	net_axis<WIDTH> currWord;
 
 	switch (iid_state)
 	{
@@ -193,7 +197,7 @@ void ip_invalid_dropper(hls::stream<net_axis<WIDTH> >&		dataIn,
 	case FWD:
 		if(!dataIn.empty())
 		{
-			net_axis<WIDTH> currWord = dataIn.read();
+			currWord = dataIn.read();
 			dataOut.write(currWord);
 			if (currWord.last)
 			{
@@ -204,7 +208,7 @@ void ip_invalid_dropper(hls::stream<net_axis<WIDTH> >&		dataIn,
 	case DROP:
 		if(!dataIn.empty())
 		{
-			net_axis<WIDTH> currWord = dataIn.read();
+			currWord = dataIn.read();
 			if (currWord.last)
 			{
 				iid_state = GET_VALID;
@@ -283,13 +287,14 @@ void cut_length(hls::stream<net_axis<512> > &dataIn, hls::stream<net_axis<512> >
 
 	enum cl_stateType {FIRST, REST};
 	static cl_stateType cl_state = FIRST;
+	net_axis<512> currWord;
 
 	switch (cl_state)
 	{
 	case FIRST:
 		if (!dataIn.empty())
 		{
-			net_axis<512> currWord = dataIn.read();
+			currWord = dataIn.read();
 
 
 			ap_uint<16> totalLength;
@@ -310,7 +315,7 @@ void cut_length(hls::stream<net_axis<512> > &dataIn, hls::stream<net_axis<512> >
 	case REST:
 		if (!dataIn.empty())
 		{
-			net_axis<512> currWord = dataIn.read();
+			currWord = dataIn.read();
 			dataOut.write(currWord);
 			if (currWord.last)
 			{
@@ -337,6 +342,7 @@ void detect_ipv4_protocol(	hls::stream<ap_uint<8> >&	ipv4ProtocolIn,
 	enum dip_stateType {META, PKG};
 	static dip_stateType dip_state = META;
 	static ap_uint<8> dip_ipProtocol;
+	net_axis<WIDTH> currWord; 
 
 	switch (dip_state)
 	{
@@ -354,7 +360,7 @@ void detect_ipv4_protocol(	hls::stream<ap_uint<8> >&	ipv4ProtocolIn,
 	case PKG:
 		if (!dataIn.empty())
 		{
-			net_axis<WIDTH> currWord = dataIn.read();
+			currWord = dataIn.read();
 			// There is not default, if package does not match any case it is automatically dropped
 			switch (dip_ipProtocol)
 			{
