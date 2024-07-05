@@ -58,8 +58,14 @@ void rocev2(
 	ap_uint<32>& regCrcDropPkgCount,
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,
-	ap_uint<32>& regIbvCountRx,
-    ap_uint<32>& regIbvCountTx
+   	ap_uint<32>& regIbvCountRx,
+   	ap_uint<16>& regIbvCountRxAck,
+	ap_uint<16>& regIbvCountRxNAck,
+	ap_uint<16>& regIbvCountRxDat,
+    ap_uint<32>& regIbvCountTx,
+	ap_uint<16>& regIbvCountTxAck,
+	ap_uint<16>& regIbvCountTxNAck,
+	ap_uint<16>& regIbvCountTxDat
 ) {
 #pragma HLS INLINE
 
@@ -167,7 +173,13 @@ void rocev2(
 		regInvalidPsnDropCount,
         regRetransCount,
 		regIbvCountRx,
-        regIbvCountTx
+   		regIbvCountRxAck,
+		regIbvCountRxNAck,
+		regIbvCountRxDat,
+    	regIbvCountTx,
+		regIbvCountTxAck,
+		regIbvCountTxNAck,
+		regIbvCountTxDat
 	);
     
 }
@@ -202,7 +214,13 @@ void rocev2_top(
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
-    ap_uint<32>& regIbvCountTx
+   	ap_uint<16>& regIbvCountRxAck,
+	ap_uint<16>& regIbvCountRxNAck,
+	ap_uint<16>& regIbvCountRxDat,
+    ap_uint<32>& regIbvCountTx,
+	ap_uint<16>& regIbvCountTxAck,
+	ap_uint<16>& regIbvCountTxNAck,
+	ap_uint<16>& regIbvCountTxDat
 ) {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
@@ -288,7 +306,13 @@ void rocev2_top(
 		regInvalidPsnDropCount,
         regRetransCount,
 		regIbvCountRx,
-        regIbvCountTx
+   		regIbvCountRxAck,
+		regIbvCountRxNAck,
+		regIbvCountRxDat,
+    	regIbvCountTx,
+		regIbvCountTxAck,
+		regIbvCountTxNAck,
+		regIbvCountTxDat
 	);
 	
 #else
@@ -321,7 +345,13 @@ void rocev2_top(
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
-    ap_uint<32>& regIbvCountTx
+   	ap_uint<16>& regIbvCountRxAck,
+	ap_uint<16>& regIbvCountRxNAck,
+	ap_uint<16>& regIbvCountRxDat,
+    ap_uint<32>& regIbvCountTx,
+	ap_uint<16>& regIbvCountTxAck,
+	ap_uint<16>& regIbvCountTxNAck,
+	ap_uint<16>& regIbvCountTxDat
 ) {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
@@ -391,7 +421,13 @@ void rocev2_top(
 		regInvalidPsnDropCount,
         regRetransCount,
 		regIbvCountRx,
-        regIbvCountTx
+   		regIbvCountRxAck,
+		regIbvCountRxNAck,
+		regIbvCountRxDat,
+    	regIbvCountTx,
+		regIbvCountTxAck,
+		regIbvCountTxNAck,
+		regIbvCountTxDat
 );
 #endif
 
