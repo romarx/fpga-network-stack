@@ -112,7 +112,9 @@ void state_table(	hls::stream<rxStateReq>& rxIbh2stateTable_upd_req,
 						hls::stream<ifStateReq>& qpi2stateTable_upd_req,
 						hls::stream<rxStateRsp>& stateTable2rxIbh_rsp,
 						hls::stream<stateTableEntry>& stateTable2txIbh_rsp,
-						hls::stream<stateTableEntry>& stateTable2qpi_rsp);
+						hls::stream<stateTableEntry>& stateTable2qpi_rsp,
+						ap_uint<40>& reg_qp_npsn,
+						ap_uint<40>& reg_qp_epsn);
 
 
 template <int INSTID = 0>
@@ -122,7 +124,9 @@ void state_table(
 	hls::stream<ifStateReq>& qpi2stateTable_upd_req,
 	hls::stream<rxStateRsp>& stateTable2rxIbh_rsp,
 	hls::stream<stateTableEntry>& stateTable2txIbh_rsp,
-	hls::stream<stateTableEntry>& stateTable2qpi_rsp
+	hls::stream<stateTableEntry>& stateTable2qpi_rsp,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 ) {
 #pragma HLS PIPELINE II=1
 #pragma HLS INLINE off
@@ -133,6 +137,10 @@ void state_table(
 #else
 	#pragma HLS RESOURCE variable=state_table core=RAM_2P_BRAM
 #endif
+	static ap_uint<40> npsn_qpn = 0;
+	static ap_uint<40> qp_npsn = 0;
+	static ap_uint<40> epsn_qpn = 0;
+	static ap_uint<40> qp_epsn = 0;
 
 	rxStateReq rxRequest;
 	txStateReq txRequest;
@@ -152,6 +160,9 @@ void state_table(
 				state_table[rxRequest.qpn].resp_epsn = rxRequest.epsn;
 				state_table[rxRequest.qpn].retryCounter = rxRequest.retryCounter;
 				//state_table[rxRequest.qpn].sendNAK = rxRequest.epsn;
+				epsn_qpn = rxRequest.qpn;
+				qp_epsn = (epsn_qpn << 24) | rxRequest.epsn;
+				reg_qp_epsn = qp_epsn;
 			}
 		}
 		else
@@ -173,6 +184,9 @@ void state_table(
 		if (txRequest.write)
 		{
 			state_table[txRequest.qpn].req_next_psn = txRequest.psn;
+			npsn_qpn = txRequest.qpn;
+			qp_npsn = (npsn_qpn << 24) | txRequest.psn;
+			reg_qp_npsn = qp_npsn;
 		}
 		else
 		{
@@ -197,6 +211,13 @@ void state_table(
 
 			//state_table[ifRequest.qpn].r_key = ifRequest.r_key;
 			//state_table[ifRequest.qpn].virtual_address = ifRequest.virtual_address;
+			npsn_qpn = ifRequest.qpn;
+			qp_npsn = (npsn_qpn << 24) | ifRequest.remote_psn;
+			reg_qp_npsn = qp_npsn;
+
+			epsn_qpn = ifRequest.qpn;
+			qp_epsn = (epsn_qpn << 24) | ifRequest.local_psn;
+			reg_qp_epsn = qp_epsn;
 		}
 		else
 		{

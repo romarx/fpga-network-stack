@@ -615,10 +615,13 @@ void ib_transport_protocol(
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
    	ap_uint<16>& regIbvCountRxAck,
-	ap_uint<16>& regIbvCountRxNAck,
-	ap_uint<16>& regIbvCountRxDat,
+	ap_uint<32>& regIbvSTSRxNAck,
+	ap_uint<32>& regIbvCountRxSRR,
     ap_uint<32>& regIbvCountTx,
 	ap_uint<16>& regIbvCountTxAck,
 	ap_uint<16>& regIbvCountTxNAck,
-	ap_uint<16>& regIbvCountTxDat
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 );

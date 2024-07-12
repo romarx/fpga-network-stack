@@ -108,7 +108,7 @@ void rx_process_exh(
 	stream<ExHeader<WIDTH> >& metaOut,
 	stream<net_axis<WIDTH> >& output,
 	ap_uint<16>&		regIbvCountRxAck,
-	ap_uint<16>&		regIbvCountRxNAck
+	ap_uint<32>&		regIbvSTSRxNAck
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -121,7 +121,9 @@ void rx_process_exh(
 	static AckExHeader<WIDTH> ackHeader;
 
 	static ap_uint<16> ack_count = 0;
-	static ap_uint<16> nack_count = 0;
+	static ap_uint<32> nack_count = 0;
+	static ap_uint<32> nack_qp = 0;
+	static ap_uint<32> nack_qp_cnt = 0;
 
 	static bool metaWritten = false;
 
@@ -161,20 +163,25 @@ void rx_process_exh(
 				if (opCode != RC_ACK)
 				{
 					output.write(currWord);
+				}else{
+					if (ackHeader.isNAK()){
+						//nack_qp = ackHeader.getDstQP();
+						nack_count++;
+						nack_qp_cnt = (nack_count << 16) | nack_qp;
+						regIbvSTSRxNAck = nack_qp_cnt;
+					}else{
+						ack_count++;
+						regIbvCountRxAck = ack_count;
+					}
 				}
+				
 				if (!metaWritten)
 				{
 					exhMetaFifo.write(exhMeta(ackHeader.isNAK()));
 					metaOut.write(ExHeader<WIDTH>(ackHeader));
 					metaWritten = true;
 				}
-				if (ackHeader.isNAK()){
-					nack_count++;
-					regIbvCountRxNAck = nack_count;
-				}else{
-					ack_count++;
-					regIbvCountRxAck = ack_count;
-				}
+				
 			}
 			if (currWord.last)
 			{
@@ -517,7 +524,7 @@ void rx_exh_fsm(
 	stream<pkgSplit>& rx_pkgSplitTypeFifo,
 	stream<pkgShift>& rx_pkgShiftTypeFifo,
 
-	ap_uint<16>&		regIbvCountRxDat
+	ap_uint<32>&		regIbvCountRxSRR
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -534,8 +541,10 @@ void rx_exh_fsm(
 	//static rxReadReqRsp readReqMeta;
 	static retransRdInit readReqInit;
 
-	static ap_uint<16> dat_count = 0;
-
+	static ap_uint<32> send_rresp_count = 0;
+	static ap_uint<32> send_count = 0;
+	static ap_uint<32> rresp_count = 0;
+	
 
 	switch (pe_fsmState)
 	{
@@ -591,6 +600,10 @@ void rx_exh_fsm(
 		case RC_SEND_ONLY: 
         case RC_SEND_LAST:
 		{
+			send_count++;
+			send_rresp_count = (rresp_count << 16) | send_count;
+			regIbvCountRxSRR =  send_rresp_count;
+
             std::cout << "[RX EXH FSM " << INSTID << "]: send opcode: " << std::hex << meta.op_code << std::endl;
 			// [BTH][PayLd]
 			// Compute payload length
@@ -603,8 +616,7 @@ void rx_exh_fsm(
 			rx_pkgSplitTypeFifo.write(pkgSplit(meta.op_code));
 			rx_pkgShiftTypeFifo.write(pkgShift(SHIFT_NONE, meta.dest_qp));
 
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			pe_fsmState = META;
 			break;
@@ -612,6 +624,10 @@ void rx_exh_fsm(
         case RC_SEND_FIRST:
         case RC_SEND_MIDDLE:
         {
+			send_count++;
+			send_rresp_count = (rresp_count << 16) | send_count;
+			regIbvCountRxSRR =  send_rresp_count;
+
             std::cout << "[RX EXH FSM " << INSTID << "]: send opcode: " << std::hex << meta.op_code << std::endl;
             // [BTH][PayLd]
 			// Compute payload length
@@ -624,8 +640,6 @@ void rx_exh_fsm(
 			rx_pkgSplitTypeFifo.write(pkgSplit(meta.op_code));
 			rx_pkgShiftTypeFifo.write(pkgShift(SHIFT_NONE, meta.dest_qp));
 
-			dat_count++;
-			regIbvCountRxDat = dat_count;
 
 			pe_fsmState = META;
 			break;
@@ -663,8 +677,7 @@ void rx_exh_fsm(
 				rx_pkgShiftTypeFifo.write(pkgShift(SHIFT_RETH, meta.dest_qp));
 				pe_fsmState = META;
 			}
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			break;
 		}
@@ -693,8 +706,7 @@ void rx_exh_fsm(
 			rx_pkgSplitTypeFifo.write(pkgSplit(meta.op_code));
 			rx_pkgShiftTypeFifo.write(pkgShift(SHIFT_NONE, meta.dest_qp));
 
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			pe_fsmState = META;
 			break;
@@ -709,8 +721,7 @@ void rx_exh_fsm(
 				rxExh2msnTable_upd_req.write(rxMsnReq(meta.dest_qp, dmaMeta.msn+1));
 			}
 
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			pe_fsmState = META;
 			break;
@@ -719,6 +730,9 @@ void rx_exh_fsm(
 		case RC_RDMA_READ_RESP_FIRST:
 		case RC_RDMA_READ_RESP_LAST:
 		{
+			rresp_count++;
+			send_rresp_count = (rresp_count << 16) | send_count;
+			regIbvCountRxSRR =  send_rresp_count;
 			// [BTH][AETH][PayLd]
 			//AETH for first and last
 			AckExHeader<WIDTH> ackHeader = exHeader.getAckHeader();
@@ -766,13 +780,16 @@ void rx_exh_fsm(
 			
 			rx_pkgSplitTypeFifo.write(pkgSplit(meta.op_code));
 
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			pe_fsmState = META;
 			break;
 		}
 		case RC_RDMA_READ_RESP_MIDDLE:
+
+			rresp_count++;
+			send_rresp_count = (rresp_count << 16) | send_count;
+			regIbvCountRxSRR =  send_rresp_count;
 			// [BTH][PayLd]
 			payLoadLength = udpLength - (8 + 12 + 4); //UDP, BTH, CRC
 			rx_pkgShiftTypeFifo.write(pkgShift(SHIFT_NONE, meta.dest_qp));
@@ -782,8 +799,7 @@ void rx_exh_fsm(
 			rxExh2msnTable_upd_req.write(rxMsnReq(meta.dest_qp, dmaMeta.msn, dmaMeta.vaddr+payLoadLength, payLoadLength, dmaMeta.lst));
 			rx_pkgSplitTypeFifo.write(pkgSplit(meta.op_code));
 			
-			dat_count++;
-			regIbvCountRxDat = dat_count;
+			
 
 			pe_fsmState = META;
 			break;
@@ -791,6 +807,7 @@ void rx_exh_fsm(
 		{
 			// [BTH][AETH]
 			AckExHeader<WIDTH> ackHeader = exHeader.getAckHeader();
+			
 
             m_axis_rx_ack_meta.write(ackMeta(meta.op_code, meta.dest_qp(19,0), readReqInit.host, 
                     readReqInit.host ? readReqInit.laddr(51,48) : 0, readReqInit.host ? readReqInit.laddr(53,52) : 0,
@@ -1447,8 +1464,7 @@ void generate_ibh(
 #ifdef RETRANS_EN
 	stream<retransMeta>& tx2retrans_insertMeta,
 #endif
-	stream<BaseTransportHeader<WIDTH> >& tx_ibhHeaderFifo,
-	ap_uint<16>& regIbvCountTxDat
+	stream<BaseTransportHeader<WIDTH> >& tx_ibhHeaderFifo
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1461,8 +1477,6 @@ void generate_ibh(
 	net_axis<WIDTH> currWord;
 	stateTableEntry qpState; //TODO what is really required
 	ap_uint<24> dstQp;
-
-	static ap_uint<16> dat_count = 0;
 
 	switch(gi_state)
 	{
@@ -1502,8 +1516,6 @@ void generate_ibh(
 			}
 			else
 			{
-				dat_count++;
-				regIbvCountTxDat = dat_count;
 				header.setPsn(qpState.req_next_psn);
 				header.setAckReq(true);
 				//Update PSN
@@ -1555,7 +1567,10 @@ void generate_exh(
 #endif
 	stream<net_axis<WIDTH> >& output,
 	ap_uint<16>& regIbvCountTxAck,
-	ap_uint<16>& regIbvCountTxNAck
+	ap_uint<16>& regIbvCountTxNAck,
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR
+
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
@@ -1572,6 +1587,11 @@ void generate_exh(
 	txPacketInfo info;
 	static ap_uint<16> count_ack = 0;
 	static ap_uint<16> count_nack = 0;
+
+	static ap_uint<32> send_rdwr_count = 0;
+	static ap_uint<32> send_count = 0;
+	static ap_uint<32> rdwr_count = 0;
+	static ap_uint<32> rresp_count = 0;
 
 	switch(ge_state)
 	{
@@ -1621,6 +1641,10 @@ void generate_exh(
 			case RC_RDMA_WRITE_ONLY:
 			case RC_RDMA_WRITE_FIRST:
 			{
+				rdwr_count++;
+				send_rdwr_count = (rdwr_count << 16) | send_count;
+				regIbvCountTxSRW = send_rdwr_count;
+
 				// [BTH][RETH][PayLd]
 				rdmaHeader.setVirtualAddress(meta.addr);
 				rdmaHeader.setLength(meta.length); //TODO Move up??
@@ -1664,6 +1688,15 @@ void generate_exh(
             case RC_SEND_FIRST:
             case RC_SEND_MIDDLE:
             case RC_SEND_LAST:
+				if(meta.op_code == RC_RDMA_WRITE_MIDDLE || RC_RDMA_WRITE_LAST) {
+					rdwr_count++;
+				} else {
+					send_count++;
+				}
+				send_rdwr_count = (rdwr_count << 16) | send_count;
+				regIbvCountTxSRW = send_rdwr_count;
+
+
 				// [BTH][PayLd]
 				info.isAETH = false;
 				info.hasHeader = false;
@@ -1677,6 +1710,9 @@ void generate_exh(
 				break;
 			case RC_RDMA_READ_REQUEST:
 			{
+				rdwr_count++;
+				send_rdwr_count = (rdwr_count << 16) | send_count;
+				regIbvCountTxSRW = send_rdwr_count;
 				// [BTH][RETH]
 				rdmaHeader.setVirtualAddress(meta.addr);
 				rdmaHeader.setLength(meta.length); //TODO Move up??
@@ -1712,6 +1748,8 @@ void generate_exh(
 			case RC_RDMA_READ_RESP_FIRST:
 			case RC_RDMA_READ_RESP_LAST:
 			{
+				rresp_count++;
+				regIbvCountTxRR = rresp_count;
 				// [BTH][AETH][PayLd]
 				//AETH for first and last
 				ackHeader.setSyndrome(0x1f);
@@ -1742,6 +1780,8 @@ void generate_exh(
 				break;
 			}
 			case RC_RDMA_READ_RESP_MIDDLE:
+				rresp_count++;
+				regIbvCountTxRR = rresp_count;
 				// [BTH][PayLd]
 				info.isAETH = true;
 				info.hasHeader = false;
@@ -2263,12 +2303,15 @@ void ib_transport_protocol(
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
    	ap_uint<16>& regIbvCountRxAck,
-	ap_uint<16>& regIbvCountRxNAck,
-	ap_uint<16>& regIbvCountRxDat,
+	ap_uint<32>& regIbvSTSRxNAck,
+	ap_uint<32>& regIbvCountRxSRR,
     ap_uint<32>& regIbvCountTx,
 	ap_uint<16>& regIbvCountTxAck,
 	ap_uint<16>& regIbvCountTxNAck,
-	ap_uint<16>& regIbvCountTxDat
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 ) {
 #pragma HLS INLINE
 
@@ -2287,8 +2330,8 @@ void ib_transport_protocol(
 	static stream<pkgShift> 	rx_pkgShiftTypeFifo("rx_pkgShiftTypeFifo");
 	#pragma HLS STREAM depth=2 variable=rx_ibh2shiftFifo
 	#pragma HLS STREAM depth=2 variable=rx_shift2exhFifo
-	#pragma HLS STREAM depth=32 variable=rx_exh2dropFifo
-	#pragma HLS STREAM depth=32 variable=rx_ibhDrop2exhFifo
+	#pragma HLS STREAM depth=64 variable=rx_exh2dropFifo
+	#pragma HLS STREAM depth=64 variable=rx_ibhDrop2exhFifo
 	#pragma HLS STREAM depth=2 variable=rx_ibh2fsm_MetaFifo
 	#pragma HLS STREAM depth=2 variable=rx_fsm2exh_MetaFifo
 	#pragma HLS STREAM depth=4 variable=rx_exh2rethShiftFifo
@@ -2544,10 +2587,10 @@ void ib_transport_protocol(
 	static stream<ExHeader<WIDTH> > rx_exh2drop_MetaFifo("rx_exh2drop_MetaFifo");
 	static stream<ExHeader<WIDTH> > rx_drop2exhFsm_MetaFifo("rx_drop2exhFsm_MetaFifo");
 	static stream<exhMeta>	rx_exhMetaFifo("rx_exhMetaFifo");
-	#pragma HLS STREAM depth=2 variable=rx_ibh2exh_MetaFifo
+	#pragma HLS STREAM depth=4 variable=rx_ibh2exh_MetaFifo
 	#pragma HLS STREAM depth=8 variable=rx_exh2drop_MetaFifo
-	#pragma HLS STREAM depth=2 variable=rx_drop2exhFsm_MetaFifo
-	#pragma HLS STREAM depth=2 variable=rx_exhMetaFifo
+	#pragma HLS STREAM depth=4 variable=rx_drop2exhFsm_MetaFifo
+	#pragma HLS STREAM depth=4 variable=rx_exhMetaFifo
 #if defined( __VITIS_HLS__)
 	#pragma HLS aggregate  variable=rx_ibh2exh_MetaFifo compact=bit
 	#pragma HLS aggregate  variable=rx_exh2drop_MetaFifo compact=bit
@@ -2580,7 +2623,7 @@ void ib_transport_protocol(
 		rx_exh2drop_MetaFifo, //TODO check if this has to be dropped
 		rx_exh2dropFifo,
 		regIbvCountRxAck,
-		regIbvCountRxNAck
+		regIbvSTSRxNAck
 	);
 
 	rx_ibh_fsm<INSTID>(	
@@ -2637,7 +2680,7 @@ void ib_transport_protocol(
 		rx_pkgSplitTypeFifo,
 		rx_pkgShiftTypeFifo,
 		
-		regIbvCountRxDat
+		regIbvCountRxSRR
 	);
 
 	rx_exh_payload<WIDTH, INSTID>(	
@@ -2731,7 +2774,9 @@ void ib_transport_protocol(
 #endif
 		tx_exh2payFifo,
 		regIbvCountTxAck,
-		regIbvCountTxNAck
+		regIbvCountTxNAck,
+		regIbvCountTxSRW,
+		regIbvCountTxRR
 	);
 
 	// Append payload to AETH or RETH
@@ -2747,8 +2792,7 @@ void ib_transport_protocol(
 #ifdef RETRANS_EN
 		tx2retrans_insertMeta,
 #endif
-		tx_ibhHeaderFifo,
-		regIbvCountTxDat
+		tx_ibhHeaderFifo
 	);
 
 	//prependt ib header
@@ -2777,7 +2821,9 @@ void ib_transport_protocol(
 		qpi2stateTable_upd_req,
 		stateTable2rxIbh_rsp,
 		stateTable2txIbh_rsp,
-		stateTable2qpi_rsp
+		stateTable2qpi_rsp,
+		reg_qp_npsn,
+		reg_qp_epsn
 	);
 
 	msn_table<INSTID>(
@@ -2851,12 +2897,15 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
     ap_uint<32>& regRetransCount,		                        \
 	ap_uint<32>& regIbvCountRx,		                       	    \
 	ap_uint<16>& regIbvCountRxAck,								\
-	ap_uint<16>& regIbvCountRxNAck,								\
-	ap_uint<16>& regIbvCountRxDat,								\
+	ap_uint<32>& regIbvSTSRxNAck,								\
+	ap_uint<32>& regIbvCountRxSRR,								\
     ap_uint<32>& regIbvCountTx,	                       	    	\
 	ap_uint<16>& regIbvCountTxAck,								\
 	ap_uint<16>& regIbvCountTxNAck,								\
-	ap_uint<16>& regIbvCountTxDat								\
+	ap_uint<32>& regIbvCountTxSRW,								\
+	ap_uint<32>& regIbvCountTxRR,								\
+	ap_uint<40>& reg_qp_npsn,									\
+	ap_uint<40>& reg_qp_epsn									\
 );
 
 #else
@@ -2878,12 +2927,15 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
     ap_uint<32>& regRetransCount,		                        \
 	ap_uint<32>& regIbvCountRx,		                       	    \
 	ap_uint<16>& regIbvCountRxAck,								\
-	ap_uint<16>& regIbvCountRxNAck,								\
-	ap_uint<16>& regIbvCountRxDat,								\
+	ap_uint<32>& regIbvSTSRxNAck,								\
+	ap_uint<32>& regIbvCountRxSRR,								\
     ap_uint<32>& regIbvCountTx,	                       	    	\
 	ap_uint<16>& regIbvCountTxAck,								\
 	ap_uint<16>& regIbvCountTxNAck,								\
-	ap_uint<16>& regIbvCountTxDat								\
+	ap_uint<32>& regIbvCountTxSRW,								\
+	ap_uint<32>& regIbvCountTxRR,								\
+	ap_uint<40>& reg_qp_npsn,									\
+	ap_uint<40>& reg_qp_epsn									\
 );
 #endif
 

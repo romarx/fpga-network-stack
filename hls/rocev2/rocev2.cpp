@@ -56,16 +56,20 @@ void rocev2(
     hls::stream<psnPkg>& m_axis_dbg_2,
 #endif
 	ap_uint<32>& regCrcDropPkgCount,
+	
 	ap_uint<32>& regInvalidPsnDropCount,
     ap_uint<32>& regRetransCount,
    	ap_uint<32>& regIbvCountRx,
    	ap_uint<16>& regIbvCountRxAck,
-	ap_uint<16>& regIbvCountRxNAck,
-	ap_uint<16>& regIbvCountRxDat,
+	ap_uint<32>& regIbvSTSRxNAck,
+	ap_uint<32>& regIbvCountRxSRR,
     ap_uint<32>& regIbvCountTx,
 	ap_uint<16>& regIbvCountTxAck,
 	ap_uint<16>& regIbvCountTxNAck,
-	ap_uint<16>& regIbvCountTxDat
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 ) {
 #pragma HLS INLINE
 
@@ -174,12 +178,15 @@ void rocev2(
         regRetransCount,
 		regIbvCountRx,
    		regIbvCountRxAck,
-		regIbvCountRxNAck,
-		regIbvCountRxDat,
+		regIbvSTSRxNAck,
+		regIbvCountRxSRR,
     	regIbvCountTx,
 		regIbvCountTxAck,
 		regIbvCountTxNAck,
-		regIbvCountTxDat
+		regIbvCountTxSRW,
+		regIbvCountTxRR,
+		reg_qp_npsn,
+		reg_qp_epsn
 	);
     
 }
@@ -215,12 +222,15 @@ void rocev2_top(
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
    	ap_uint<16>& regIbvCountRxAck,
-	ap_uint<16>& regIbvCountRxNAck,
-	ap_uint<16>& regIbvCountRxDat,
+	ap_uint<32>& regIbvSTSRxNAck,
+	ap_uint<32>& regIbvCountRxSRR,
     ap_uint<32>& regIbvCountTx,
 	ap_uint<16>& regIbvCountTxAck,
 	ap_uint<16>& regIbvCountTxNAck,
-	ap_uint<16>& regIbvCountTxDat
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 ) {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
@@ -307,12 +317,15 @@ void rocev2_top(
         regRetransCount,
 		regIbvCountRx,
    		regIbvCountRxAck,
-		regIbvCountRxNAck,
-		regIbvCountRxDat,
+		regIbvSTSRxNAck,
+		regIbvCountRxSRR,
     	regIbvCountTx,
 		regIbvCountTxAck,
 		regIbvCountTxNAck,
-		regIbvCountTxDat
+		regIbvCountTxSRW,
+		regIbvCountTxRR,
+		reg_qp_npsn,
+		reg_qp_epsn
 	);
 	
 #else
@@ -346,12 +359,15 @@ void rocev2_top(
     ap_uint<32>& regRetransCount,
 	ap_uint<32>& regIbvCountRx,
    	ap_uint<16>& regIbvCountRxAck,
-	ap_uint<16>& regIbvCountRxNAck,
-	ap_uint<16>& regIbvCountRxDat,
+	ap_uint<32>& regIbvSTSRxNAck,
+	ap_uint<32>& regIbvCountRxSRR,
     ap_uint<32>& regIbvCountTx,
 	ap_uint<16>& regIbvCountTxAck,
 	ap_uint<16>& regIbvCountTxNAck,
-	ap_uint<16>& regIbvCountTxDat
+	ap_uint<32>& regIbvCountTxSRW,
+	ap_uint<32>& regIbvCountTxRR,
+	ap_uint<40>& reg_qp_npsn,
+	ap_uint<40>& reg_qp_epsn
 ) {
 	#pragma HLS DATAFLOW disable_start_propagation
 	#pragma HLS INTERFACE ap_ctrl_none port=return
@@ -422,12 +438,15 @@ void rocev2_top(
         regRetransCount,
 		regIbvCountRx,
    		regIbvCountRxAck,
-		regIbvCountRxNAck,
-		regIbvCountRxDat,
+		regIbvSTSRxNAck,
+		regIbvCountRxSRR,
     	regIbvCountTx,
 		regIbvCountTxAck,
 		regIbvCountTxNAck,
-		regIbvCountTxDat
+		regIbvCountTxSRW,
+		regIbvCountTxRR,
+		reg_qp_npsn,
+		reg_qp_epsn
 );
 #endif
 
