@@ -75,7 +75,7 @@ void rx_process_ibh(
 			if (!metaWritten) {
 				std::cout << "[RX PROCESS IBH " << INSTID << "]: input psn " << std::hex << bth.getPsn() << std::endl;
                 
-            	metaOut.write(ibhMeta(bth.getOpCode(), bth.getPartitionKey(), bth.getDstQP(), bth.getPsn(), true));
+            	metaOut.write(ibhMeta(bth.getOpCode(), bth.getPartitionKey(), (bth.getDstQP() - 1), bth.getPsn(), true));
 				metaOut2.write(bth.getOpCode());
 				metaWritten = true;
 
@@ -91,7 +91,7 @@ void rx_process_ibh(
 			metaWritten = false;
 
 #ifdef DBG_IBV
-		m_axis_dbg.write(psnPkg(bth.getOpCode(), bth.getPsn(), bth.getDstQP(), currWord.last));
+		m_axis_dbg.write(psnPkg(bth.getOpCode(), bth.getPsn(), (bth.getDstQP()), currWord.last));
 #endif
 		}
 	}
