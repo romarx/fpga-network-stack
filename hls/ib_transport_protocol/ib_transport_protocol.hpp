@@ -140,14 +140,15 @@ struct readRequest
 {
 	ap_uint<24> qpn;
 	ap_uint<64> vaddr;
+	ap_uint<32> tag;
 	ap_uint<32> dma_length;
 	ap_uint<24> psn;
 	ap_uint<1>  host;
 	
 	readRequest() {}
-	readRequest(ap_uint<24> qpn, ap_uint<64> vaddr, ap_uint<32> len, ap_uint<24> psn)
+	readRequest(ap_uint<24> qpn, ap_uint<64> vaddr, ap_uint<32> tag, ap_uint<32> len, ap_uint<24> psn)
 //		:qpn(qpn), vaddr(vaddr), dma_length(len), psn(psn) {}
-		:qpn(qpn), vaddr(vaddr), dma_length(len), psn(psn), host(1) {}
+		:qpn(qpn), vaddr(vaddr), tag(tag), dma_length(len), psn(psn), host(1) {}
 };
 
 struct fwdPolicy
@@ -176,18 +177,21 @@ struct memCmdInternal
 	ibOpCode op_code;
 	ap_uint<16> qpn; //TODO required
 	ap_uint<64> addr;
+	ap_uint<32> tag;
 	ap_uint<32> len;
 	ap_uint<1>  host;
     ap_uint<1>  sync;
     ap_uint<6>  offs;
 	memCmdInternal() {}
 	memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len, ap_uint<1> host)
-		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(1), offs(0) {}
+		: op_code(op), qpn(qpn), addr(addr), tag(0), len(len), host(host), sync(1), offs(0) {}
     memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len, ap_uint<1> host, ap_uint<1> sync, ap_uint<6> offs)
-		: op_code(op), qpn(qpn), addr(addr), len(len), host(host), sync(sync), offs(offs) {}
+		: op_code(op), qpn(qpn), addr(addr), tag(0), len(len), host(host), sync(sync), offs(offs) {}
+	memCmdInternal(ibOpCode op, ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> tag, ap_uint<32> len, ap_uint<1> host, ap_uint<1> sync, ap_uint<6> offs)
+		: op_code(op), qpn(qpn), addr(addr), tag(tag), len(len), host(host), sync(sync), offs(offs) {}
     // TODO: need to set some default value?
     memCmdInternal(ap_uint<16> qpn, ap_uint<64> addr, ap_uint<32> len)
-        : qpn(qpn), addr(addr), len(len), host(1), sync(1) {}
+        : qpn(qpn), addr(addr), tag(0), len(len), host(1), sync(1) {}
 };
 
 /* Mem command */
@@ -197,6 +201,7 @@ struct memCmd
 	ap_uint<16> qpn;
 	ap_uint<1>  lst;
 	ap_uint<64> addr;
+	ap_uint<32> tag;
 	ap_uint<4>  dst;
 	ap_uint<2>  strm;
 	ap_uint<28> len;
@@ -206,7 +211,9 @@ struct memCmd
 
 	memCmd() {}
 	memCmd(ibOpCode op_code, ap_uint<16> qpn, ap_uint<1> lst, ap_uint<64> addr, ap_uint<28> len, ap_uint<1> actv, ap_uint<1> host, ap_uint<6> offs)
-		:op_code(op_code), qpn(qpn), lst(lst), addr(addr), dst(addr(51,48)), strm(addr(53,52)), len(len), actv(actv), host(host), offs(offs) {}
+		:op_code(op_code), qpn(qpn), lst(lst), addr(addr), tag(0), dst(addr(51,48)), strm(addr(53,52)), len(len), actv(actv), host(host), offs(offs) {}
+	memCmd(ibOpCode op_code, ap_uint<16> qpn, ap_uint<1> lst, ap_uint<64> addr, ap_uint<32> tag, ap_uint<28> len, ap_uint<1> actv, ap_uint<1> host, ap_uint<6> offs)
+		:op_code(op_code), qpn(qpn), lst(lst), addr(addr), tag(tag), dst(addr(51,48)), strm(addr(53,52)), len(len), actv(actv), host(host), offs(offs) {}
 };
 
 /* TX */

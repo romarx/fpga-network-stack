@@ -661,11 +661,11 @@ void rx_exh_fsm(
 				// Send external request
 				if(meta.op_code == RC_RDMA_WRITE_ONLY)
 				{
-					memoryWriteCmd.write(memCmd(meta.op_code, meta.dest_qp, PKG_F, rdmaHeader.getVirtualAddress(), payLoadLength, PKG_NR, PKG_HOST, 0));
+					memoryWriteCmd.write(memCmd(meta.op_code, meta.dest_qp, PKG_F, rdmaHeader.getVirtualAddress(), rdmaHeader.getRemoteKey(), payLoadLength, PKG_NR, PKG_HOST, 0));
 				}
 				if(meta.op_code == RC_RDMA_WRITE_FIRST) 
 				{
-					memoryWriteCmd.write(memCmd(meta.op_code, meta.dest_qp, PKG_NF, rdmaHeader.getVirtualAddress(), payLoadLength, PKG_NR, PKG_HOST, 0));
+					memoryWriteCmd.write(memCmd(meta.op_code, meta.dest_qp, PKG_NF, rdmaHeader.getVirtualAddress(), rdmaHeader.getRemoteKey(), payLoadLength, PKG_NR, PKG_HOST, 0));
 				}
 
 				// Update state
@@ -717,7 +717,7 @@ void rx_exh_fsm(
 			RdmaExHeader<WIDTH> rdmaHeader = exHeader.getRdmaHeader();
 			if (rdmaHeader.getLength() != 0)
 			{
-				readRequestFifo.write(readRequest(meta.dest_qp, rdmaHeader.getVirtualAddress(), rdmaHeader.getLength(), meta.psn));
+				readRequestFifo.write(readRequest(meta.dest_qp, rdmaHeader.getVirtualAddress(), rdmaHeader.getRemoteKey(), rdmaHeader.getLength(), meta.psn));
 				rxExh2msnTable_upd_req.write(rxMsnReq(meta.dest_qp, dmaMeta.msn+1));
 			}
 
@@ -990,6 +990,7 @@ void handle_read_requests(
 	static readRequest request; //Need QP, dma_length, vaddr
 	ibOpCode readOpcode;
 	ap_uint<64> readAddr;
+	ap_uint<32> readTag;
 	ap_uint<32> readLength;
 	ap_uint<32> dmaLength;
 
@@ -1000,6 +1001,7 @@ void handle_read_requests(
 		{
 			requestIn.read(request);
 			readAddr = request.vaddr;
+			readTag = request.tag;
 			readLength = request.dma_length;
 			dmaLength = request.dma_length;
 			readOpcode = RC_RDMA_READ_RESP_ONLY;
@@ -1012,13 +1014,14 @@ void handle_read_requests(
 				hrr_fsmState = GENERATE;
 			}
 
-			memoryReadCmd.write(memCmdInternal(readOpcode, request.qpn, readAddr, readLength, request.host, PKG_NR, 0));
+			memoryReadCmd.write(memCmdInternal(readOpcode, request.qpn, readAddr, readTag, readLength, request.host, PKG_NR, 0));
 			readEventFifo.write(event(readOpcode, request.qpn, readLength, request.psn));
             std::cout << "[READ_HANDLER " << INSTID << "]: read handler init packet, psn " << request.psn << std::endl;
 		}
 		break;
 	case GENERATE:
 		readAddr = request.vaddr;
+		readTag = request.tag;
 		readLength = request.dma_length;
 
 		if (request.dma_length > PMTU)
@@ -1036,7 +1039,7 @@ void handle_read_requests(
             std::cout << "[READ_HANDLER " << INSTID << "]: read handler last packet, psn " << request.psn << std::endl;
 		}
 		request.psn++;
-		memoryReadCmd.write(memCmdInternal(readOpcode, request.qpn, readAddr, readLength, request.host, PKG_NR, 0));
+		memoryReadCmd.write(memCmdInternal(readOpcode, request.qpn, readAddr, readTag, readLength, request.host, PKG_NR, 0));
 		readEventFifo.write(event(readOpcode, request.qpn, readLength, request.psn));
 
 		break;
@@ -1222,17 +1225,17 @@ void mem_cmd_merger(
 
 		if(cmd.op_code == RC_RDMA_READ_RESP_ONLY || cmd.op_code == RC_RDMA_READ_RESP_LAST) 
 		{
-			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_F, cmd.addr, cmd.len, PKG_NR, cmd.host, 0));
+			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_F, cmd.addr, cmd.tag, cmd.len, PKG_NR, cmd.host, 0));
 			pkgInfoFifo.write(pkgInfo(AETH, ((cmd.len+(WIDTH/8)-1)/(WIDTH/8))));
 		}
 		if(cmd.op_code == RC_RDMA_READ_RESP_MIDDLE) 
 		{
-			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_NF, cmd.addr, cmd.len, PKG_NR, cmd.host, 0));
+			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_NF, cmd.addr, cmd.tag, cmd.len, PKG_NR, cmd.host, 0));
 			pkgInfoFifo.write(pkgInfo(RAW, ((cmd.len+(WIDTH/8)-1)/(WIDTH/8))));
 		}
 		if(cmd.op_code == RC_RDMA_READ_RESP_FIRST) 
 		{
-			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_NF, cmd.addr, cmd.len, PKG_NR, cmd.host, 0));
+			out.write(memCmd(cmd.op_code, cmd.qpn, PKG_NF, cmd.addr, cmd.tag, cmd.len, PKG_NR, cmd.host, 0));
 			pkgInfoFifo.write(pkgInfo(AETH, ((cmd.len+(WIDTH/8)-1)/(WIDTH/8))));
 		}
 	}
