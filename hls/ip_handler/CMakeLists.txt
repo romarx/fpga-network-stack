@@ -7,7 +7,7 @@ project(${PROJECT_NAME})
 
 # Include custom Find<Module>.cmake scripts to enable searching for Vivado HLS
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake)
-
+#set(FPGA_PART xc7vx690tffg1761-2 CACHE STRING "FPGA part")
 # Without this variable set, CMake will build tests when running install
 #set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON)
 
@@ -20,10 +20,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/../../cma
 #      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 #endif()
 
-
-set(FPGA_PART xcu250-figd2104-2L-e CACHE STRING "FPGA part")
 set(DATA_WIDTH 8 CACHE STRING "Width of data path in bytes")
-set(CLOCK_PERIOD 6.4 CACHE STRING "Target clock period in nanoseconds")
 
 
 # Find Xilinx HLS

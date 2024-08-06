@@ -12,7 +12,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/xilinx-cm
 
 # Domain options
 set(DATA_WIDTH 64 CACHE STRING "Width of data path in bytes")
-set(CLOCK_PERIOD 3.2 CACHE STRING "Clock period.")
+set(FPGA_PART xcu250-figd2104-2l-e CACHE STRING "FPGA part")
+set(CLOCK_PERIOD 4 CACHE STRING "Target clock period in nanoseconds")
 
 
 # HLS IPs
