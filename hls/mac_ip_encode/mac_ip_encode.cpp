@@ -347,7 +347,7 @@ void mac_ip_encode_top( hls::stream<net_axis<DATA_WIDTH> >&			dataIn,
 	#pragma HLS INTERFACE axis register port=dataOut name=m_axis_ip
 
 
-	#pragma HLS INTERFACE ap_stable register port=theirMacAddress
+	#pragma HLS INTERFACE ap_none register port=theirMacAddress
 	#pragma HLS INTERFACE ap_stable register port=myMacAddress
 
 

@@ -37,7 +37,8 @@ struct connTableEntry
 	//ap_uint<24> local_qpn;
 	ap_uint<24> remote_qpn;
 	ap_uint<128> remote_ip_address; //TODO make variable
-	ap_uint<16> remote_udp_port; //TODO what is this used for
+	ap_uint<16> remote_udp_port; //TODO what is this used for? this is the output port, at least in RecoNIC, it is always the same, kind of a waste of space tbh
+	ap_uint<48> dest_mac_address;
 };
 
 template <int INSTID>
@@ -73,5 +74,6 @@ void conn_table(	hls::stream<ap_uint<16> >&	tx_ibhconnTable_req,
 		conn_table[ifRequest.qpn].remote_qpn = ifRequest.remote_qpn;
 		conn_table[ifRequest.qpn].remote_ip_address = ifRequest.remote_ip_address;
 		conn_table[ifRequest.qpn].remote_udp_port = ifRequest.remote_udp_port;
+		conn_table[ifRequest.qpn].dest_mac_address = ifRequest.dest_mac_address;
 	}
 }

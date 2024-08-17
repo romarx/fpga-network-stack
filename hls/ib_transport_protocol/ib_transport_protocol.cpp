@@ -2158,13 +2158,15 @@ void tx_ipUdpMetaMerger(
 	stream<connTableEntry>& tx_connTable2ibh_rsp,
 	stream<ap_uint<16> >&	tx_lengthFifo,
 	stream<ipUdpMeta>&		m_axis_tx_meta,
-	stream<ap_uint<24> >&	tx_dstQpFifo
+	stream<ap_uint<24> >&	tx_dstQpFifo,
+	ap_uint<48>&			dest_mac_address
 ) {
 #pragma HLS inline off
 #pragma HLS pipeline II=1
 
 	connTableEntry connMeta;
 	ap_uint<16> len;
+	
 
 	if (!tx_connTable2ibh_rsp.empty() && !tx_lengthFifo.empty())
 	{
@@ -2173,6 +2175,7 @@ void tx_ipUdpMetaMerger(
 		std::cout << "[TX IP UDP META MERGER " << INSTID << "]: port " << connMeta.remote_udp_port << std::endl;
 		m_axis_tx_meta.write(ipUdpMeta(connMeta.remote_ip_address, RDMA_DEFAULT_PORT, connMeta.remote_udp_port, len));
 		tx_dstQpFifo.write(connMeta.remote_qpn);
+		dest_mac_address = connMeta.dest_mac_address;
 	}
 }
 
@@ -2295,6 +2298,8 @@ void ib_transport_protocol(
 	// QP
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
+
+	ap_uint<48>& dest_mac_address,
 
 	// Debug
 #ifdef DBG_IBV
@@ -2802,7 +2807,7 @@ void ib_transport_protocol(
 	prepend_ibh_header<WIDTH, INSTID>(tx_ibhHeaderFifo, tx_shift2ibhFifo, m_axis_tx_data, regIbvCountTx);
 
 	//Get Meta data for UDP & IP layer
-	tx_ipUdpMetaMerger(tx_connTable2ibh_rsp, tx_lengthFifo, m_axis_tx_meta, tx_dstQpFifo);
+	tx_ipUdpMetaMerger(tx_connTable2ibh_rsp, tx_lengthFifo, m_axis_tx_meta, tx_dstQpFifo, dest_mac_address);
 
 	//merge read requests
 	mem_cmd_merger<WIDTH>(rx_remoteMemCmd, tx_localMemCmdFifo, m_axis_mem_read_cmd, tx_pkgInfoFifo);
@@ -2893,6 +2898,7 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
 	stream<net_axis<DATA_WIDTH> >& s_axis_mem_read_data,		\
 	stream<qpContext>& s_axis_qp_interface,		               	\
 	stream<ifConnReq>& s_axis_qp_conn_interface,		        \
+	ap_uint<48>& dest_mac_address,								\
 	stream<psnPkg>& m_axis_dbg_0,		                        \
     stream<psnPkg>& m_axis_dbg_1,		                        \
     stream<psnPkg>& m_axis_dbg_2,		                        \
@@ -2926,6 +2932,7 @@ template void ib_transport_protocol<DATA_WIDTH, ninst>(		   	\
 	stream<net_axis<DATA_WIDTH> >& s_axis_mem_read_data,		\
 	stream<qpContext>& s_axis_qp_interface,		               	\
 	stream<ifConnReq>& s_axis_qp_conn_interface,		        \
+	ap_uint<48>& dest_mac_address,								\
 	ap_uint<32>& regInvalidPsnDropCount,		                \
     ap_uint<32>& regRetransCount,		                        \
 	ap_uint<32>& regIbvCountRx,		                       	    \

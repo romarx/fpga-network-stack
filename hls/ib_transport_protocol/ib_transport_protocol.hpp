@@ -131,9 +131,10 @@ struct ifConnReq
 	ap_uint<24> remote_qpn;
 	ap_uint<128> remote_ip_address; //TODO make variable
 	ap_uint<16> remote_udp_port; //TODO what is this used for
+	ap_uint<48> dest_mac_address;
 	ifConnReq() {}
-	ifConnReq(ap_uint<16> qpn, ap_uint<24> remote_qpn, ap_uint<128> remote_ip_address, ap_uint<16> remote_udp_port)
-				:qpn(qpn), remote_qpn(remote_qpn), remote_ip_address(remote_ip_address), remote_udp_port(remote_udp_port) {}
+	ifConnReq(ap_uint<16> qpn, ap_uint<24> remote_qpn, ap_uint<128> remote_ip_address, ap_uint<16> remote_udp_port, ap_uint<48> dest_mac_address)
+				:qpn(qpn), remote_qpn(remote_qpn), remote_ip_address(remote_ip_address), remote_udp_port(remote_udp_port), dest_mac_address(dest_mac_address) {}
 };
 
 struct readRequest
@@ -611,6 +612,8 @@ void ib_transport_protocol(
 	// QP
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
+	ap_uint<48>& dest_mac_address,
+
 
 	// Debug
 #ifdef DBG_IBV

@@ -63,6 +63,7 @@ void rocev2(
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	ap_uint<48>& dest_mac_address,
 	
 	// Debug
 #ifdef DBG_IBV

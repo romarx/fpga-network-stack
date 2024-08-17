@@ -48,6 +48,7 @@ void rocev2(
 	hls::stream<qpContext>&	s_axis_qp_interface,
 	hls::stream<ifConnReq>&	s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	ap_uint<48>& dest_mac_address,
 
 	//Debug output
 #ifdef DBG_IBV
@@ -169,6 +170,7 @@ void rocev2(
 		s_axis_mem_read_data,
 		s_axis_qp_interface,
 		s_axis_qp_conn_interface,
+		dest_mac_address,
 #ifdef DBG_IBV
 		m_axis_dbg_0,
 		m_axis_dbg_1,
@@ -210,6 +212,8 @@ void rocev2_top(
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	ap_uint<48>& dest_mac_address,
+
 
 	//Debug output
 #ifdef DBG_IBV
@@ -306,6 +310,8 @@ void rocev2_top(
 		s_axis_qp_interface,
 		s_axis_qp_conn_interface,
 		local_ip_address,
+		dest_mac_address,
+
 
 #ifdef DBG_IBV
 		m_axis_dbg_0,
@@ -347,6 +353,8 @@ void rocev2_top(
 	stream<qpContext>& s_axis_qp_interface,
 	stream<ifConnReq>& s_axis_qp_conn_interface,
 	ap_uint<128> local_ip_address,
+	ap_uint<48>& dest_mac_address,
+
 
 	//Debug output
 #ifdef DBG_IBV
@@ -427,6 +435,8 @@ void rocev2_top(
 		s_axis_qp_interface,
 		s_axis_qp_conn_interface,
 		local_ip_address,
+		dest_mac_address,
+
 
 #ifdef DBG_IBV
 		m_axis_dbg_0,
